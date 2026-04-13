@@ -16,7 +16,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         const validUsername = process.env.UI_USERNAME ?? 'admin'
-        const validHash = process.env.UI_PASSWORD_HASH ?? ''
+        // bcryptハッシュはBase64エンコードして保存（Docker Composeが$を変数展開するのを防ぐ）
+        const hashB64 = process.env.UI_PASSWORD_HASH ?? ''
+        const validHash = Buffer.from(hashB64, 'base64').toString()
 
         if (username !== validUsername) return null
 
