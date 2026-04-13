@@ -45,8 +45,17 @@ services:
     depends_on:
       step-ca:
         condition: service_healthy
-    env_file:
-      - .env
+    environment:
+      - CA_URL=${CA_URL}
+      - CA_FINGERPRINT=${CA_FINGERPRINT}
+      - CA_PROVISIONER=${CA_PROVISIONER}
+      - CA_PROVISIONER_PASSWORD=${CA_PROVISIONER_PASSWORD}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - AUTH_TRUST_HOST=true
+      - UI_USERNAME=${UI_USERNAME}
+      - UI_PASSWORD_HASH=${UI_PASSWORD_HASH}
+      - NEXT_PUBLIC_CA_URL=${NEXT_PUBLIC_CA_URL}
     networks:
       - step-network
 
