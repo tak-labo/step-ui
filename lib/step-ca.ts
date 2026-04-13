@@ -204,7 +204,7 @@ export class StepCAClient {
 
   // admin API に OTT を使って ACME プロビジョナーを作成する
   async createAcmeProvisioner(name: string): Promise<void> {
-    const token = this.getOneTimeToken('step-ui')
+    const token = this.getOneTimeToken('admin')
     const res = await this.fetchCA('/admin/provisioners', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` },
@@ -218,7 +218,7 @@ export class StepCAClient {
 
   // admin API に OTT を使ってプロビジョナーを削除する
   async deleteProvisioner(name: string): Promise<void> {
-    const token = this.getOneTimeToken('step-ui')
+    const token = this.getOneTimeToken('admin')
     const res = await this.fetchCA(`/admin/provisioners/${encodeURIComponent(name)}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` },
