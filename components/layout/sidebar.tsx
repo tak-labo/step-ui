@@ -26,7 +26,7 @@ export function Sidebar() {
             key={item.href}
             href={item.href}
             className={`block px-3 py-2 rounded text-sm transition-colors ${
-              pathname.startsWith(item.href)
+              pathname === item.href || pathname.startsWith(item.href + '/')
                 ? 'bg-gray-700 text-white'
                 : 'text-gray-300 hover:bg-gray-800'
             }`}
