@@ -98,10 +98,14 @@ export class StepCAClient {
       keys: keyPair,
       signingAlgorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
       extensions: [
-        new x509.SubjectAlternativeNameExtension({
-          dns: subject.sans.filter(s => !s.match(/^\d+\.\d+\.\d+\.\d+$/)),
-          ip: subject.sans.filter(s => s.match(/^\d+\.\d+\.\d+\.\d+$/)),
-        }),
+        new x509.SubjectAlternativeNameExtension([
+          ...subject.sans
+            .filter(s => !s.match(/^\d+\.\d+\.\d+\.\d+$/))
+            .map(s => ({ type: 'dns' as const, value: s })),
+          ...subject.sans
+            .filter(s => s.match(/^\d+\.\d+\.\d+\.\d+$/))
+            .map(s => ({ type: 'ip' as const, value: s })),
+        ]),
       ],
     })
 
