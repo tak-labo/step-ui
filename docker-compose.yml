@@ -23,8 +23,11 @@ services:
             --address ":9000" \
             --provisioner "admin" \
             --password-file /home/step/password
-          # プロビジョナーの最大証明書有効期間を10年に変更
-          sed -i 's/"maxTLSCertDuration": "24h"/"maxTLSCertDuration": "87600h"/g' /home/step/config/ca.json
+          # authority.claims をグローバルに設定して最大証明書有効期間を10年に拡張する。
+          # step ca init はca.jsonにプロビジョナーのclaimsを書き出さないため
+          # 個別フィールドをsedで置換する方式は機能しない。
+          # "authority": { の直後にclaimsブロックを挿入する。
+          sed -i 's/"authority": {/"authority": {\n\t\t"claims": {"minTLSCertDuration": "5m", "maxTLSCertDuration": "87600h", "defaultTLSCertDuration": "24h"},/' /home/step/config/ca.json
           # enableAdmin: true は設定しない。
           # enableAdmin=true だとプロビジョナーがDBで管理されca.json直接編集が無効になる。
         fi
