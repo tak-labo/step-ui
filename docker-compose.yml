@@ -1,6 +1,6 @@
 services:
   step-ca:
-    image: smallstep/step-ca:latest
+    image: smallstep/step-ca:0.27.4
     container_name: step-ca
     ports:
       - "9000:9000"
@@ -15,8 +15,15 @@ services:
       sh -c "
         mkdir -p /home/step &&
         echo 'StepCAPassword123!' > /home/step/password &&
+        chmod 600 /home/step/password &&
         /usr/local/bin/docker-entrypoint.sh /home/step/config/ca.json
       "
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --no-check-certificate -O- https://localhost:9000/health || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
     networks:
       - step-network
 
@@ -28,7 +35,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - step-ca
+      step-ca:
+        condition: service_healthy
     env_file:
       - .env
     networks:
