@@ -1,8 +1,37 @@
-export default function CertificatesPage() {
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { CertTable } from '@/components/certificates/cert-table'
+import { getStepCAClient } from '@/lib/step-ca'
+import type { CertificateInfo } from '@/lib/step-ca'
+
+export default async function CertificatesPage() {
+  let certificates: CertificateInfo[] = []
+  let error = ''
+
+  try {
+    const client = getStepCAClient()
+    certificates = await client.listCertificates()
+  } catch (e) {
+    error = e instanceof Error ? e.message : '証明書の取得に失敗しました'
+  }
+
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4">証明書管理</h2>
-      <p className="text-gray-500">読み込み中...</p>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold">証明書管理</h2>
+        <Link href="/certificates/new">
+          <Button>新規証明書を発行</Button>
+        </Link>
+      </div>
+
+      {error ? (
+        <div className="bg-red-50 border border-red-200 rounded p-4 text-red-700">
+          <p className="font-medium">エラー</p>
+          <p className="text-sm mt-1">{error}</p>
+        </div>
+      ) : (
+        <CertTable certificates={certificates} />
+      )}
     </div>
   )
 }
