@@ -1,4 +1,9 @@
 import * as x509 from '@peculiar/x509'
+import { execFileSync } from 'child_process'
+import { writeFileSync, unlinkSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { randomBytes } from 'crypto'
 
 export interface StepCAConfig {
   caUrl: string
@@ -52,21 +57,8 @@ export class StepCAClient {
     })
   }
 
-  async getOneTimeToken(subject: string): Promise<string> {
-    const res = await this.fetchCA('/1.0/token', {
-      method: 'POST',
-      body: JSON.stringify({
-        subject,
-        provisioner: this.config.provisioner,
-        password: this.config.provisionerPassword,
-      }),
-    })
-    if (!res.ok) {
-      const err = await res.text()
-      throw new Error(`OTT取得失敗: ${err}`)
-    }
-    const data = await res.json() as { token: string }
-    return data.token
+  getOneTimeToken(subject: string): string {
+    return this.runStepToken(subject, false)
   }
 
   async generateCertificate(
@@ -109,7 +101,7 @@ export class StepCAClient {
       ],
     })
 
-    const token = await this.getOneTimeToken(hostname)
+    const token = this.getOneTimeToken(hostname)
 
     const res = await this.fetchCA('/1.0/sign', {
       method: 'POST',
@@ -133,7 +125,7 @@ export class StepCAClient {
   }
 
   async listCertificates(): Promise<CertificateInfo[]> {
-    const token = await this.getAdminToken()
+    const token = this.getAdminToken()
     const res = await this.fetchCA('/admin/certs', {
       headers: { 'Authorization': `Bearer ${token}` },
     })
@@ -169,7 +161,7 @@ export class StepCAClient {
   }
 
   async revokeCertificate(serialNumber: string): Promise<void> {
-    const token = await this.getAdminToken()
+    const token = this.getAdminToken()
     const res = await this.fetchCA(`/admin/certs/${serialNumber}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` },
@@ -182,7 +174,7 @@ export class StepCAClient {
   }
 
   async listProvisioners(): Promise<Array<{ name: string; type: string; details: unknown }>> {
-    const token = await this.getAdminToken()
+    const token = this.getAdminToken()
     const res = await this.fetchCA('/admin/provisioners', {
       headers: { 'Authorization': `Bearer ${token}` },
     })
@@ -197,7 +189,7 @@ export class StepCAClient {
   }
 
   async createAcmeProvisioner(name: string): Promise<void> {
-    const token = await this.getAdminToken()
+    const token = this.getAdminToken()
     const res = await this.fetchCA('/admin/provisioners', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` },
@@ -215,7 +207,7 @@ export class StepCAClient {
   }
 
   async deleteProvisioner(name: string): Promise<void> {
-    const token = await this.getAdminToken()
+    const token = this.getAdminToken()
     const res = await this.fetchCA(`/admin/provisioners/${encodeURIComponent(name)}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` },
@@ -231,27 +223,43 @@ export class StepCAClient {
     return `${this.config.caUrl}/acme/${encodeURIComponent(provisionerName)}/directory`
   }
 
-  // NOTE: step-caのAdmin APIは実際には/admin/tokenというエンドポイントを持ちません。
-  // 正確な認証フローはstep-caのバージョンと設定に依存します。
-  // 本番環境では以下のいずれかの方法でAdmin APIを認証する必要があります：
-  // 1. ステップCLI経由でOTTを取得: `step ca token --admin-provisioner <prov> <subject>`
-  // 2. 管理者クライアント証明書を使用
-  // 3. step-ca Management API Provisioner Keyを使って直接JWTを署名
-  // 現在の実装はstep-caとの接続テスト後に修正が必要です。
-  private async getAdminToken(): Promise<string> {
-    const res = await this.fetchCA('/admin/token', {
-      method: 'POST',
-      body: JSON.stringify({
-        provisioner: this.config.provisioner,
-        password: this.config.provisionerPassword,
-      }),
-    })
-    if (!res.ok) {
-      const err = await res.text()
-      throw new Error(`管理トークン取得失敗: ${err}`)
+  // step CLIを使ってトークンを生成する。
+  // step-caはトークンをAPIで発行しない。JWKプロビジョナーの秘密鍵（/home/step/secrets/）を
+  // プロビジョナーパスワードで復号してJWTを署名する必要がある。
+  // step CLIがその処理を担当する。
+  //
+  // docker-compose.ymlで step-data:/home/step:ro をマウント済みなので
+  // Next.jsコンテナからも /home/step/certs/root_ca.crt が参照できる。
+  //
+  // execFileSync（引数を配列で渡す）でシェルインジェクションを防止している。
+  private runStepToken(subject: string, isAdmin: boolean): string {
+    const tmpPass = join(tmpdir(), `step-pass-${randomBytes(8).toString('hex')}`)
+    try {
+      writeFileSync(tmpPass, this.config.provisionerPassword, { mode: 0o600 })
+
+      const args = [
+        'ca', 'token',
+        '--ca-url', this.config.caUrl,
+        '--root', '/home/step/certs/root_ca.crt',
+        '--provisioner', this.config.provisioner,
+        '--provisioner-password-file', tmpPass,
+        ...(isAdmin
+          ? ['--admin-provisioner', this.config.provisioner, '--admin-subject', 'step-ui']
+          : []),
+        subject,
+      ]
+
+      return execFileSync('step', args, {
+        encoding: 'utf-8',
+        timeout: 15000,
+      }).trim()
+    } finally {
+      try { unlinkSync(tmpPass) } catch { /* ignore */ }
     }
-    const data = await res.json() as { token: string }
-    return data.token
+  }
+
+  private getAdminToken(): string {
+    return this.runStepToken('step-ui', true)
   }
 }
 
