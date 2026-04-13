@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from 'node:crypto'
+import * as x509 from '@peculiar/x509'
 
 export interface StepCAConfig {
   caUrl: string
@@ -77,20 +77,41 @@ export class StepCAClient {
     const subject = this.buildCertificateSubject(hostname, sans)
     const validDuration = this.parseDuration(duration)
 
-    const { privateKey, publicKey } = generateKeyPairSync('rsa', {
-      modulusLength: 2048,
-    })
+    // WebCrypto APIでRSA鍵ペアを生成（@peculiar/x509はWebCrypto使用）
+    const keyPair = await crypto.subtle.generateKey(
+      { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+      true,
+      ['sign', 'verify']
+    )
 
-    const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string
+    // 秘密鍵をPKCS8 PEM形式にエクスポート
+    const privateKeyBuf = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey)
+    const privateKeyPem = [
+      '-----BEGIN PRIVATE KEY-----',
+      Buffer.from(privateKeyBuf).toString('base64').match(/.{1,64}/g)!.join('\n'),
+      '-----END PRIVATE KEY-----',
+    ].join('\n')
+
+    // 正しいCSRを生成（秘密鍵で自己署名）
+    const csr = await x509.Pkcs10CertificateRequestGenerator.create({
+      name: `CN=${hostname}`,
+      keys: keyPair,
+      signingAlgorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      extensions: [
+        new x509.SubjectAlternativeNameExtension({
+          dns: subject.sans.filter(s => !s.match(/^\d+\.\d+\.\d+\.\d+$/)),
+          ip: subject.sans.filter(s => s.match(/^\d+\.\d+\.\d+\.\d+$/)),
+        }),
+      ],
+    })
 
     const token = await this.getOneTimeToken(hostname)
 
     const res = await this.fetchCA('/1.0/sign', {
       method: 'POST',
       body: JSON.stringify({
-        csr: publicKey.export({ type: 'spki', format: 'pem' }),
+        csr: csr.toString('pem'),
         ott: token,
-        sans: subject.sans,
         notAfter: validDuration,
       }),
     })
@@ -215,7 +236,8 @@ export class StepCAClient {
       }),
     })
     if (!res.ok) {
-      return this.config.provisionerPassword
+      const err = await res.text()
+      throw new Error(`管理トークン取得失敗: ${err}`)
     }
     const data = await res.json() as { token: string }
     return data.token

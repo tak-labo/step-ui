@@ -8,7 +8,8 @@ const config: Config = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1'
   },
-  testMatch: ['**/__tests__/**/*.test.ts']
+  testMatch: ['**/__tests__/**/*.test.ts'],
+  setupFiles: ['reflect-metadata'],
 }
 
 export default config
