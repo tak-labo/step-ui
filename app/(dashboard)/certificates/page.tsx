@@ -1,3 +1,8 @@
+// このServer ComponentはNext.js App Routerのパターンに従い、
+// APIルートを経由せず直接step-caクライアントを呼び出す。
+// 認証は親レイアウト(app/(dashboard)/layout.tsx)が担保しているため、
+// ここでのauth()チェックは不要。
+// /api/certificates GETはクライアントサイドfetch用として提供。
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { CertTable } from '@/components/certificates/cert-table'
