@@ -7,18 +7,25 @@ services:
     volumes:
       - step-data:/home/step
     environment:
-      - DOCKER_STEPCA_INIT_NAME=Step CA
-      - DOCKER_STEPCA_INIT_DNS_NAMES=step-ca,localhost
-      - DOCKER_STEPCA_INIT_PROVISIONER_NAME=admin
-      - DOCKER_STEPCA_INIT_PASSWORD_FILE=/home/step/password
       - STEPCA_PASSWORD
-    entrypoint: >
-      sh -c "
-        mkdir -p /home/step &&
-        echo \"$${STEPCA_PASSWORD:-StepCAPassword123!}\" > /home/step/password &&
-        chmod 600 /home/step/password &&
-        /usr/local/bin/docker-entrypoint.sh /home/step/config/ca.json
-      "
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        set -e
+        mkdir -p /home/step/config
+        echo "$${STEPCA_PASSWORD:-StepCAPassword123!}" > /home/step/password
+        chmod 600 /home/step/password
+        if [ ! -f /home/step/config/ca.json ]; then
+          step ca init \
+            --name "Step CA" \
+            --dns "step-ca,localhost" \
+            --address ":9000" \
+            --provisioner "admin" \
+            --password-file /home/step/password \
+            --deployment-type standalone
+        fi
+        exec step-ca /home/step/config/ca.json --password-file /home/step/password
     healthcheck:
       test: ["CMD-SHELL", "wget -q --no-check-certificate -O- https://localhost:9000/health || exit 1"]
       interval: 5s
