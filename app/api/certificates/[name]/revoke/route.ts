@@ -15,7 +15,7 @@ export async function POST(_request: Request, { params }: Params) {
 
   try {
     const client = getStepCAClient()
-    await client.revokeCertificate(serialNumber)
+    client.revokeCertificate(serialNumber)
     return NextResponse.json({ success: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : '不明なエラー'

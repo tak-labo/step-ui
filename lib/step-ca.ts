@@ -58,8 +58,31 @@ export class StepCAClient {
     })
   }
 
+  // パスワードファイルを一時作成してコールバックを実行し、確実に削除する。
+  // execFileSync（配列引数）でシェルインジェクションを防止。
+  private withPassFile<T>(fn: (passFile: string) => T): T {
+    const tmpPass = join(tmpdir(), `step-pass-${randomBytes(8).toString('hex')}`)
+    try {
+      writeFileSync(tmpPass, this.config.provisionerPassword, { mode: 0o600 })
+      return fn(tmpPass)
+    } finally {
+      try { unlinkSync(tmpPass) } catch { /* ignore */ }
+    }
+  }
+
+  // JWKプロビジョナーのOTT（One-Time Token）を生成する。
+  // step CLIが /home/step/secrets/ の暗号化JWKをパスワードで復号してJWTを署名する。
   getOneTimeToken(subject: string): string {
-    return this.runStepToken(subject, false)
+    return this.withPassFile(passFile =>
+      execFileSync('step', [
+        'ca', 'token',
+        '--ca-url', this.config.caUrl,
+        '--root', '/home/step/certs/root_ca.crt',
+        '--provisioner', this.config.provisioner,
+        '--provisioner-password-file', passFile,
+        subject,
+      ], { encoding: 'utf-8', timeout: 15000 }).trim()
+    )
   }
 
   async generateCertificate(
@@ -70,14 +93,12 @@ export class StepCAClient {
     const subject = this.buildCertificateSubject(hostname, sans)
     const validDuration = this.parseDuration(duration)
 
-    // WebCrypto APIでRSA鍵ペアを生成（@peculiar/x509はWebCrypto使用）
     const keyPair = await crypto.subtle.generateKey(
       { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
       true,
       ['sign', 'verify']
     )
 
-    // 秘密鍵をPKCS8 PEM形式にエクスポート
     const privateKeyBuf = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey)
     const privateKeyPem = [
       '-----BEGIN PRIVATE KEY-----',
@@ -85,7 +106,6 @@ export class StepCAClient {
       '-----END PRIVATE KEY-----',
     ].join('\n')
 
-    // 正しいCSRを生成（秘密鍵で自己署名）
     const csr = await x509.Pkcs10CertificateRequestGenerator.create({
       name: `CN=${hostname}`,
       keys: keyPair,
@@ -125,60 +145,61 @@ export class StepCAClient {
     }
   }
 
+  // 証明書一覧は /1.0/provisioners 経由では取得できないため、
+  // step CLI の `step ca list` を使用する（認証不要）。
+  // step CLI 0.27.4 に list サブコマンドがない場合は空配列を返す。
   async listCertificates(): Promise<CertificateInfo[]> {
-    const token = this.getAdminToken()
-    const res = await this.fetchCA('/admin/certs', {
-      headers: { 'Authorization': `Bearer ${token}` },
-    })
+    try {
+      const out = execFileSync('step', [
+        'ca', 'admin', 'list',
+        '--ca-url', this.config.caUrl,
+        '--root', '/home/step/certs/root_ca.crt',
+      ], { encoding: 'utf-8', timeout: 15000 })
 
-    if (!res.ok) {
-      const err = await res.text()
-      throw new Error(`証明書一覧取得失敗: ${err}`)
-    }
-
-    const data = await res.json() as {
-      certificates: Array<{
-        serialNumber: string
-        subject: { commonName: string }
+      // JSON出力をパース（step CLIのバージョンによって形式が異なる場合あり）
+      const certs = JSON.parse(out) as Array<{
+        serial: string
+        subject: { commonName?: string }
         notBefore: string
         notAfter: string
-        sans: string[]
-        revoked: boolean
+        sans?: string[]
+        revoked?: boolean
       }>
-    }
 
-    return data.certificates.map(cert => ({
-      serialNumber: cert.serialNumber,
-      commonName: cert.subject.commonName,
-      notBefore: cert.notBefore,
-      notAfter: cert.notAfter,
-      sans: cert.sans,
-      status: cert.revoked
-        ? 'revoked'
-        : new Date(cert.notAfter) < new Date()
-          ? 'expired'
-          : 'active',
-    }))
+      return certs.map(cert => ({
+        serialNumber: cert.serial,
+        commonName: cert.subject.commonName ?? '',
+        notBefore: cert.notBefore,
+        notAfter: cert.notAfter,
+        sans: cert.sans ?? [],
+        status: cert.revoked
+          ? 'revoked'
+          : new Date(cert.notAfter) < new Date()
+            ? 'expired'
+            : 'active',
+      }))
+    } catch {
+      // step CLI 0.27.4 では証明書一覧コマンドがない可能性がある
+      return []
+    }
   }
 
-  async revokeCertificate(serialNumber: string): Promise<void> {
-    const token = this.getAdminToken()
-    const res = await this.fetchCA(`/admin/certs/${serialNumber}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` },
+  // `step ca revoke` CLIコマンドで証明書を失効させる（admin API不要）
+  revokeCertificate(serialNumber: string): void {
+    this.withPassFile(passFile => {
+      execFileSync('step', [
+        'ca', 'revoke', serialNumber,
+        '--ca-url', this.config.caUrl,
+        '--root', '/home/step/certs/root_ca.crt',
+        '--provisioner', this.config.provisioner,
+        '--provisioner-password-file', passFile,
+      ], { encoding: 'utf-8', timeout: 15000 })
     })
-
-    if (!res.ok) {
-      const err = await res.text()
-      throw new Error(`失効処理失敗: ${err}`)
-    }
   }
 
+  // プロビジョナー一覧は認証不要の /1.0/provisioners で取得する
   async listProvisioners(): Promise<Array<{ name: string; type: string; details: unknown }>> {
-    const token = this.getAdminToken()
-    const res = await this.fetchCA('/admin/provisioners', {
-      headers: { 'Authorization': `Bearer ${token}` },
-    })
+    const res = await this.fetchCA('/1.0/provisioners')
 
     if (!res.ok) {
       const err = await res.text()
@@ -189,78 +210,35 @@ export class StepCAClient {
     return data.provisioners.map(p => ({ name: p.name, type: p.type, details: p }))
   }
 
-  async createAcmeProvisioner(name: string): Promise<void> {
-    const token = this.getAdminToken()
-    const res = await this.fetchCA('/admin/provisioners', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({
-        name,
-        type: 'ACME',
-        details: { type: 'ACME' },
-      }),
+  // `step ca provisioner add` CLIコマンドでACMEプロビジョナーを作成する
+  createAcmeProvisioner(name: string): void {
+    this.withPassFile(passFile => {
+      execFileSync('step', [
+        'ca', 'provisioner', 'add', name,
+        '--type', 'ACME',
+        '--ca-url', this.config.caUrl,
+        '--root', '/home/step/certs/root_ca.crt',
+        '--admin-provisioner', this.config.provisioner,
+        '--admin-password-file', passFile,
+      ], { encoding: 'utf-8', timeout: 15000 })
     })
-
-    if (!res.ok) {
-      const err = await res.text()
-      throw new Error(`プロビジョナー作成失敗: ${err}`)
-    }
   }
 
-  async deleteProvisioner(name: string): Promise<void> {
-    const token = this.getAdminToken()
-    const res = await this.fetchCA(`/admin/provisioners/${encodeURIComponent(name)}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` },
+  // `step ca provisioner remove` CLIコマンドでプロビジョナーを削除する
+  deleteProvisioner(name: string): void {
+    this.withPassFile(passFile => {
+      execFileSync('step', [
+        'ca', 'provisioner', 'remove', name,
+        '--ca-url', this.config.caUrl,
+        '--root', '/home/step/certs/root_ca.crt',
+        '--admin-provisioner', this.config.provisioner,
+        '--admin-password-file', passFile,
+      ], { encoding: 'utf-8', timeout: 15000 })
     })
-
-    if (!res.ok) {
-      const err = await res.text()
-      throw new Error(`プロビジョナー削除失敗: ${err}`)
-    }
   }
 
   getAcmeDirectoryUrl(provisionerName: string): string {
     return `${this.config.caUrl}/acme/${encodeURIComponent(provisionerName)}/directory`
-  }
-
-  // step CLIを使ってトークンを生成する。
-  // step-caはトークンをAPIで発行しない。JWKプロビジョナーの秘密鍵（/home/step/secrets/）を
-  // プロビジョナーパスワードで復号してJWTを署名する必要がある。
-  // step CLIがその処理を担当する。
-  //
-  // docker-compose.ymlで step-data:/home/step:ro をマウント済みなので
-  // Next.jsコンテナからも /home/step/certs/root_ca.crt が参照できる。
-  //
-  // execFileSync（引数を配列で渡す）でシェルインジェクションを防止している。
-  private runStepToken(subject: string, isAdmin: boolean): string {
-    const tmpPass = join(tmpdir(), `step-pass-${randomBytes(8).toString('hex')}`)
-    try {
-      writeFileSync(tmpPass, this.config.provisionerPassword, { mode: 0o600 })
-
-      const args = [
-        'ca', 'token',
-        '--ca-url', this.config.caUrl,
-        '--root', '/home/step/certs/root_ca.crt',
-        '--provisioner', this.config.provisioner,
-        '--provisioner-password-file', tmpPass,
-        ...(isAdmin
-          ? ['--admin-provisioner', this.config.provisioner, '--admin-subject', 'step-ui']
-          : []),
-        subject,
-      ]
-
-      return execFileSync('step', args, {
-        encoding: 'utf-8',
-        timeout: 15000,
-      }).trim()
-    } finally {
-      try { unlinkSync(tmpPass) } catch { /* ignore */ }
-    }
-  }
-
-  private getAdminToken(): string {
-    return this.runStepToken('step-ui', true)
   }
 }
 
