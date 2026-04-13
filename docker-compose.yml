@@ -45,6 +45,8 @@ services:
     depends_on:
       step-ca:
         condition: service_healthy
+    volumes:
+      - step-data:/home/step:ro
     environment:
       - CA_URL=${CA_URL}
       - CA_FINGERPRINT=${CA_FINGERPRINT}
