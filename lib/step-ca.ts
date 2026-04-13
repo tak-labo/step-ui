@@ -145,33 +145,34 @@ export class StepCAClient {
     }
   }
 
-  // 証明書一覧は /1.0/provisioners 経由では取得できないため、
-  // step CLI の `step ca list` を使用する（認証不要）。
-  // step CLI 0.27.4 に list サブコマンドがない場合は空配列を返す。
+  // 証明書一覧は admin API を OTT で取得する。
+  // step-ca 0.27.4 では JWK プロビジョナーの OTT が admin API でも使用できる。
+  // 取得できない場合は空配列を返す（headless環境での互換性のため）。
   async listCertificates(): Promise<CertificateInfo[]> {
     try {
-      const out = execFileSync('step', [
-        'ca', 'admin', 'list',
-        '--ca-url', this.config.caUrl,
-        '--root', '/home/step/certs/root_ca.crt',
-      ], { encoding: 'utf-8', timeout: 15000 })
+      const token = this.getOneTimeToken('step-ui')
+      const res = await this.fetchCA('/admin/certs', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (!res.ok) return []
 
-      // JSON出力をパース（step CLIのバージョンによって形式が異なる場合あり）
-      const certs = JSON.parse(out) as Array<{
-        serial: string
-        subject: { commonName?: string }
-        notBefore: string
-        notAfter: string
-        sans?: string[]
-        revoked?: boolean
-      }>
+      const data = await res.json() as {
+        certificates?: Array<{
+          serialNumber: string
+          subject: { commonName: string }
+          notBefore: string
+          notAfter: string
+          sans: string[]
+          revoked: boolean
+        }>
+      }
 
-      return certs.map(cert => ({
-        serialNumber: cert.serial,
-        commonName: cert.subject.commonName ?? '',
+      return (data.certificates ?? []).map(cert => ({
+        serialNumber: cert.serialNumber,
+        commonName: cert.subject.commonName,
         notBefore: cert.notBefore,
         notAfter: cert.notAfter,
-        sans: cert.sans ?? [],
+        sans: cert.sans,
         status: cert.revoked
           ? 'revoked'
           : new Date(cert.notAfter) < new Date()
@@ -179,7 +180,6 @@ export class StepCAClient {
             : 'active',
       }))
     } catch {
-      // step CLI 0.27.4 では証明書一覧コマンドがない可能性がある
       return []
     }
   }
@@ -210,31 +210,31 @@ export class StepCAClient {
     return data.provisioners.map(p => ({ name: p.name, type: p.type, details: p }))
   }
 
-  // `step ca provisioner add` CLIコマンドでACMEプロビジョナーを作成する
-  createAcmeProvisioner(name: string): void {
-    this.withPassFile(passFile => {
-      execFileSync('step', [
-        'ca', 'provisioner', 'add', name,
-        '--type', 'ACME',
-        '--ca-url', this.config.caUrl,
-        '--root', '/home/step/certs/root_ca.crt',
-        '--admin-provisioner', this.config.provisioner,
-        '--admin-password-file', passFile,
-      ], { encoding: 'utf-8', timeout: 15000 })
+  // admin API に OTT を使って ACME プロビジョナーを作成する
+  async createAcmeProvisioner(name: string): Promise<void> {
+    const token = this.getOneTimeToken('step-ui')
+    const res = await this.fetchCA('/admin/provisioners', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ name, type: 'ACME', details: { type: 'ACME' } }),
     })
+    if (!res.ok) {
+      const err = await res.text()
+      throw new Error(`プロビジョナー作成失敗: ${err}`)
+    }
   }
 
-  // `step ca provisioner remove` CLIコマンドでプロビジョナーを削除する
-  deleteProvisioner(name: string): void {
-    this.withPassFile(passFile => {
-      execFileSync('step', [
-        'ca', 'provisioner', 'remove', name,
-        '--ca-url', this.config.caUrl,
-        '--root', '/home/step/certs/root_ca.crt',
-        '--admin-provisioner', this.config.provisioner,
-        '--admin-password-file', passFile,
-      ], { encoding: 'utf-8', timeout: 15000 })
+  // admin API に OTT を使ってプロビジョナーを削除する
+  async deleteProvisioner(name: string): Promise<void> {
+    const token = this.getOneTimeToken('step-ui')
+    const res = await this.fetchCA(`/admin/provisioners/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
     })
+    if (!res.ok) {
+      const err = await res.text()
+      throw new Error(`プロビジョナー削除失敗: ${err}`)
+    }
   }
 
   getAcmeDirectoryUrl(provisionerName: string): string {

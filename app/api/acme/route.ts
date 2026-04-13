@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
   try {
     const client = getStepCAClient()
-    client.createAcmeProvisioner(body.name)
+    await client.createAcmeProvisioner(body.name)
     return NextResponse.json({ success: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : '不明なエラー'
@@ -59,7 +59,7 @@ export async function DELETE(request: Request) {
 
   try {
     const client = getStepCAClient()
-    client.deleteProvisioner(body.name)
+    await client.deleteProvisioner(body.name)
     return NextResponse.json({ success: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : '不明なエラー'
