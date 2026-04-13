@@ -175,17 +175,28 @@ export class StepCAClient {
     }))
   }
 
-  // `step ca revoke` CLIコマンドで証明書を失効させ、ストアのステータスも更新する
+  // `step ca revoke` CLIコマンドで証明書を失効させ、ストアのステータスも更新する。
+  // step ca revoke は --provisioner-password-file を受け付けないため、
+  // まず --revoke フラグ付きで OTT を生成し、--token で渡す。
   revokeCertificate(serialNumber: string): void {
-    this.withPassFile(passFile => {
+    const token = this.withPassFile(passFile =>
       execFileSync('step', [
-        'ca', 'revoke', serialNumber,
+        'ca', 'token',
+        '--revoke',
         '--ca-url', this.config.caUrl,
         '--root', '/home/step/certs/root_ca.crt',
         '--provisioner', this.config.provisioner,
         '--provisioner-password-file', passFile,
-      ], { encoding: 'utf-8', timeout: 15000 })
-    })
+        serialNumber,
+      ], { encoding: 'utf-8', timeout: 15000 }).trim()
+    )
+    execFileSync('step', [
+      'ca', 'revoke',
+      '--token', token,
+      '--ca-url', this.config.caUrl,
+      '--root', '/home/step/certs/root_ca.crt',
+      serialNumber,
+    ], { encoding: 'utf-8', timeout: 15000 })
     updateCertStatus(serialNumber, 'revoked')
   }
 
