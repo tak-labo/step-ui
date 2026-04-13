@@ -22,8 +22,7 @@ services:
             --dns "step-ca,localhost" \
             --address ":9000" \
             --provisioner "admin" \
-            --password-file /home/step/password \
-            --deployment-type standalone
+            --password-file /home/step/password
           # プロビジョナーの最大証明書有効期間を10年に変更
           sed -i 's/"maxTLSCertDuration": "24h"/"maxTLSCertDuration": "87600h"/g' /home/step/config/ca.json
         fi
