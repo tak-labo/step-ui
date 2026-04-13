@@ -179,6 +179,9 @@ export class StepCAClient {
   // step ca revoke は --provisioner-password-file を受け付けないため、
   // まず --revoke フラグ付きで OTT を生成し、--token で渡す。
   revokeCertificate(serialNumber: string): void {
+    // @peculiar/x509 は16進数でserialNumberを返すが、step ca は10進数を要求する
+    const decimalSerial = BigInt('0x' + serialNumber).toString(10)
+
     const token = this.withPassFile(passFile =>
       execFileSync('step', [
         'ca', 'token',
@@ -187,7 +190,7 @@ export class StepCAClient {
         '--root', '/home/step/certs/root_ca.crt',
         '--provisioner', this.config.provisioner,
         '--provisioner-password-file', passFile,
-        serialNumber,
+        decimalSerial,
       ], { encoding: 'utf-8', timeout: 15000 }).trim()
     )
     execFileSync('step', [
@@ -195,7 +198,7 @@ export class StepCAClient {
       '--token', token,
       '--ca-url', this.config.caUrl,
       '--root', '/home/step/certs/root_ca.crt',
-      serialNumber,
+      decimalSerial,
     ], { encoding: 'utf-8', timeout: 15000 })
     updateCertStatus(serialNumber, 'revoked')
   }
