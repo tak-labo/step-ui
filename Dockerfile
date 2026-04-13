@@ -18,7 +18,7 @@ ENV NODE_ENV=production
 
 # step CLIをインストール（step-caとのトークン生成に使用）
 # GitHub releasesから取得し、findで実行ファイルを探してインストール
-RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates docker.io \
     && rm -rf /var/lib/apt/lists/* \
     && wget -q https://github.com/smallstep/cli/releases/download/v0.27.4/step_linux_amd64.tar.gz -O /tmp/step.tar.gz \
     && tar xzf /tmp/step.tar.gz -C /tmp \

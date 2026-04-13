@@ -202,31 +202,33 @@ export class StepCAClient {
     return data.provisioners.map(p => ({ name: p.name, type: p.type, details: p }))
   }
 
-  // admin API に OTT を使って ACME プロビジョナーを作成する
-  async createAcmeProvisioner(name: string): Promise<void> {
-    const token = this.getOneTimeToken('admin')
-    const res = await this.fetchCA('/admin/provisioners', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ name, type: 'ACME', details: { type: 'ACME' } }),
+  // step CLI のオフラインモードで ca.json を直接書き換えて ACME プロビジョナーを追加し、
+  // Docker CLI で step-ca を再起動して変更を反映させる。
+  // admin API は step-ca 0.27.4 スタンドアロンでは x5c 認証を要求するため使用不可。
+  createAcmeProvisioner(name: string): void {
+    execFileSync('step', [
+      'ca', 'provisioner', 'add', name,
+      '--type', 'ACME',
+      '--offline',
+    ], {
+      encoding: 'utf-8',
+      timeout: 15000,
+      env: { ...process.env, STEPPATH: '/home/step' },
     })
-    if (!res.ok) {
-      const err = await res.text()
-      throw new Error(`プロビジョナー作成失敗: ${err}`)
-    }
+    execFileSync('docker', ['restart', 'step-ca'], { encoding: 'utf-8', timeout: 60000 })
   }
 
-  // admin API に OTT を使ってプロビジョナーを削除する
-  async deleteProvisioner(name: string): Promise<void> {
-    const token = this.getOneTimeToken('admin')
-    const res = await this.fetchCA(`/admin/provisioners/${encodeURIComponent(name)}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` },
+  // step CLI のオフラインモードでプロビジョナーを削除し、step-ca を再起動する
+  deleteProvisioner(name: string): void {
+    execFileSync('step', [
+      'ca', 'provisioner', 'remove', name,
+      '--offline',
+    ], {
+      encoding: 'utf-8',
+      timeout: 15000,
+      env: { ...process.env, STEPPATH: '/home/step' },
     })
-    if (!res.ok) {
-      const err = await res.text()
-      throw new Error(`プロビジョナー削除失敗: ${err}`)
-    }
+    execFileSync('docker', ['restart', 'step-ca'], { encoding: 'utf-8', timeout: 60000 })
   }
 
   getAcmeDirectoryUrl(provisionerName: string): string {

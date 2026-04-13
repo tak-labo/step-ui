@@ -49,8 +49,9 @@ services:
       step-ca:
         condition: service_healthy
     volumes:
-      - step-data:/home/step:ro
+      - step-data:/home/step
       - cert-store:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - CA_URL=${CA_URL}
       - CA_FINGERPRINT=${CA_FINGERPRINT}
