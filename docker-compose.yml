@@ -58,6 +58,7 @@ services:
       - UI_USERNAME=${UI_USERNAME}
       - UI_PASSWORD_HASH=${UI_PASSWORD_HASH}
       - NEXT_PUBLIC_CA_URL=${NEXT_PUBLIC_CA_URL}
+      - NODE_EXTRA_CA_CERTS=/home/step/certs/root_ca.crt
     networks:
       - step-network
 
