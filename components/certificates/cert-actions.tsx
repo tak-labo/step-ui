@@ -27,6 +27,7 @@ export function CertActions({ certificate, certPem, keyPem }: CertActionsProps) 
 
   async function handleRevoke() {
     setLoading('revoke')
+    setError('')
     try {
       const res = await fetch(
         `/api/certificates/${encodeURIComponent(certificate.serialNumber)}/revoke`,
