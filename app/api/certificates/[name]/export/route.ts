@@ -1,0 +1,36 @@
+import { NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
+
+interface Params {
+  params: Promise<{ name: string }>
+}
+
+export async function POST(request: Request, { params }: Params) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
+
+  const { name } = await params
+  const hostname = decodeURIComponent(name)
+
+  let body: { certificate: string; privateKey: string; format: 'pem' | 'pfx' }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'リクエストボディが不正です' }, { status: 400 })
+  }
+
+  if (body.format === 'pem') {
+    const pemBundle = `${body.certificate}\n${body.privateKey}`
+    return new Response(pemBundle, {
+      headers: {
+        'Content-Type': 'application/x-pem-file',
+        'Content-Disposition': `attachment; filename="${hostname}.pem"`,
+      },
+    })
+  }
+
+  return NextResponse.json(
+    { error: 'PFX形式は現在サポートされていません' },
+    { status: 501 }
+  )
+}
