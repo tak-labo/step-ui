@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import * as x509 from '@peculiar/x509'
 import { execFileSync } from 'child_process'
-import { readFileSync, writeFileSync, unlinkSync } from 'fs'
+import { writeFileSync, unlinkSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
@@ -216,41 +216,56 @@ export class StepCAClient {
     return data.provisioners.map(p => ({ name: p.name, type: p.type, details: p }))
   }
 
-  // ca.json を直接編集して ACME プロビジョナーを追加し、step-ca を再起動する。
-  // admin API は step-ca 0.27.4 スタンドアロンでは x5c 認証を要求するため使用不可。
-  // step ca provisioner add に --offline フラグは存在しないため直接編集方式を採用。
-  createAcmeProvisioner(name: string): void {
-    const caConfigPath = '/home/step/config/ca.json'
-    const caConfig = JSON.parse(readFileSync(caConfigPath, 'utf-8'))
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const provisioners: any[] = caConfig.authority?.provisioners ?? []
-    if (provisioners.some((p: { name: string }) => p.name === name)) {
-      throw new Error(`プロビジョナー "${name}" は既に存在します`)
+  // --remote-management で作成される "Admin JWK" プロビジョナーを使い、
+  // 短命な管理者証明書を発行してプロビジョナー管理 API を認証する。
+  // docker restart 不要・DB経由で即時反映される。
+  private withAdminCert<T>(fn: (adminCert: string, adminKey: string) => T): T {
+    const id = randomBytes(8).toString('hex')
+    const adminCert = join(tmpdir(), `step-admin-cert-${id}.crt`)
+    const adminKey = join(tmpdir(), `step-admin-key-${id}.key`)
+    try {
+      this.withPassFile(passFile => {
+        execFileSync('step', [
+          'ca', 'certificate', 'step',
+          adminCert, adminKey,
+          '--ca-url', this.config.caUrl,
+          '--root', '/home/step/certs/root_ca.crt',
+          '--provisioner', 'Admin JWK',
+          '--provisioner-password-file', passFile,
+          '--not-after', '5m',
+          '--force',
+        ], { encoding: 'utf-8', timeout: 15000 })
+      })
+      return fn(adminCert, adminKey)
+    } finally {
+      try { unlinkSync(adminCert) } catch { /* ignore */ }
+      try { unlinkSync(adminKey) } catch { /* ignore */ }
     }
-    provisioners.push({
-      type: 'ACME',
-      name,
-      forceCN: false,
-      claims: { enableSSHCA: false },
-      options: { x509: {}, ssh: {} },
-    })
-    caConfig.authority = { ...caConfig.authority, provisioners }
-    writeFileSync(caConfigPath, JSON.stringify(caConfig, null, 2))
-    execFileSync('docker', ['restart', 'step-ca'], { encoding: 'utf-8', timeout: 60000 })
   }
 
-  // ca.json からプロビジョナーを削除し、step-ca を再起動する
+  createAcmeProvisioner(name: string): void {
+    this.withAdminCert((adminCert, adminKey) => {
+      execFileSync('step', [
+        'ca', 'provisioner', 'add', name,
+        '--type', 'ACME',
+        '--admin-cert', adminCert,
+        '--admin-key', adminKey,
+        '--ca-url', this.config.caUrl,
+        '--root', '/home/step/certs/root_ca.crt',
+      ], { encoding: 'utf-8', timeout: 15000 })
+    })
+  }
+
   deleteProvisioner(name: string): void {
-    const caConfigPath = '/home/step/config/ca.json'
-    const caConfig = JSON.parse(readFileSync(caConfigPath, 'utf-8'))
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const provisioners: any[] = caConfig.authority?.provisioners ?? []
-    caConfig.authority = {
-      ...caConfig.authority,
-      provisioners: provisioners.filter((p: { name: string }) => p.name !== name),
-    }
-    writeFileSync(caConfigPath, JSON.stringify(caConfig, null, 2))
-    execFileSync('docker', ['restart', 'step-ca'], { encoding: 'utf-8', timeout: 60000 })
+    this.withAdminCert((adminCert, adminKey) => {
+      execFileSync('step', [
+        'ca', 'provisioner', 'remove', name,
+        '--admin-cert', adminCert,
+        '--admin-key', adminKey,
+        '--ca-url', this.config.caUrl,
+        '--root', '/home/step/certs/root_ca.crt',
+      ], { encoding: 'utf-8', timeout: 15000 })
+    })
   }
 
   getAcmeDirectoryUrl(provisionerName: string): string {

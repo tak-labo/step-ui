@@ -17,7 +17,6 @@ export default function AcmePage() {
   const [provisioners, setProvisioners] = useState<Provisioner[]>([])
   const [newName, setNewName] = useState('')
   const [loading, setLoading] = useState(false)
-  const [restarting, setRestarting] = useState(false)
   const [deletingName, setDeletingName] = useState<string | null>(null)
   const [error, setError] = useState('')
 
@@ -59,10 +58,6 @@ export default function AcmePage() {
         return
       }
       setNewName('')
-      setRestarting(true)
-      // docker restart step-ca の再起動完了を待つ（約5秒）
-      await new Promise(resolve => setTimeout(resolve, 5000))
-      setRestarting(false)
       await loadProvisioners()
     } catch {
       setError('通信エラーが発生しました')
@@ -86,10 +81,6 @@ export default function AcmePage() {
         setError(data.error)
         return
       }
-      setRestarting(true)
-      // docker restart step-ca の再起動完了を待つ（約5秒）
-      await new Promise(resolve => setTimeout(resolve, 5000))
-      setRestarting(false)
       await loadProvisioners()
     } catch {
       setError('通信エラーが発生しました')
@@ -164,7 +155,7 @@ export default function AcmePage() {
               />
             </div>
             <Button type="submit" disabled={loading}>
-              {restarting ? 'CA再起動中...' : loading ? '追加中...' : '追加'}
+              {loading ? '追加中...' : '追加'}
             </Button>
           </form>
         </CardContent>
