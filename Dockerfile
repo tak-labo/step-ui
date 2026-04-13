@@ -13,6 +13,7 @@ RUN npm run build
 # runnerはDebian slim（glibc）を使用
 # step CLI の標準Linuxバイナリ（ELF/glibc）はAlpine(musl)では動かないため
 FROM node:20-slim AS runner
+WORKDIR /app
 ENV NODE_ENV=production
 
 # step CLIをインストール（step-caとのトークン生成に使用）
