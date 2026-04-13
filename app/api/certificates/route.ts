@@ -10,7 +10,7 @@ export async function GET() {
 
   try {
     const client = getStepCAClient()
-    const certificates = await client.listCertificates()
+    const certificates = client.listCertificates()
     return NextResponse.json({ certificates })
   } catch (error) {
     const message = error instanceof Error ? error.message : '不明なエラー'

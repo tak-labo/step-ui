@@ -5,6 +5,7 @@ import { writeFileSync, unlinkSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
+import { loadCerts, saveCert, updateCertStatus } from './cert-store'
 
 export interface StepCAConfig {
   caUrl: string
@@ -139,52 +140,42 @@ export class StepCAClient {
     }
 
     const data = await res.json() as { crt: string; ca: string }
+
+    // 発行した証明書のメタデータをローカルストアに保存（一覧表示用）
+    try {
+      const parsed = new x509.X509Certificate(data.crt)
+      saveCert({
+        serialNumber: parsed.serialNumber,
+        commonName: hostname,
+        notBefore: parsed.notBefore.toISOString(),
+        notAfter: parsed.notAfter.toISOString(),
+        sans: subject.sans,
+        status: 'active',
+      })
+    } catch { /* メタデータ保存失敗は無視 */ }
+
     return {
       certificate: data.crt,
       privateKey: privateKeyPem,
     }
   }
 
-  // 証明書一覧は admin API を OTT で取得する。
-  // step-ca 0.27.4 では JWK プロビジョナーの OTT が admin API でも使用できる。
-  // 取得できない場合は空配列を返す（headless環境での互換性のため）。
-  async listCertificates(): Promise<CertificateInfo[]> {
-    try {
-      const token = this.getOneTimeToken('step-ui')
-      const res = await this.fetchCA('/admin/certs', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      if (!res.ok) return []
-
-      const data = await res.json() as {
-        certificates?: Array<{
-          serialNumber: string
-          subject: { commonName: string }
-          notBefore: string
-          notAfter: string
-          sans: string[]
-          revoked: boolean
-        }>
-      }
-
-      return (data.certificates ?? []).map(cert => ({
-        serialNumber: cert.serialNumber,
-        commonName: cert.subject.commonName,
-        notBefore: cert.notBefore,
-        notAfter: cert.notAfter,
-        sans: cert.sans,
-        status: cert.revoked
-          ? 'revoked'
-          : new Date(cert.notAfter) < new Date()
-            ? 'expired'
-            : 'active',
-      }))
-    } catch {
-      return []
-    }
+  // 証明書一覧はローカルストアから返す。
+  // step-ca の admin API は専用の管理者トークンが必要で OTT では認証できないため、
+  // 証明書生成時にメタデータを /home/step/step-ui-certs.json へ保存している。
+  listCertificates(): CertificateInfo[] {
+    return loadCerts().map(cert => ({
+      ...cert,
+      // 期限切れ判定を最新化
+      status: cert.status === 'revoked'
+        ? 'revoked'
+        : new Date(cert.notAfter) < new Date()
+          ? 'expired'
+          : 'active',
+    }))
   }
 
-  // `step ca revoke` CLIコマンドで証明書を失効させる（admin API不要）
+  // `step ca revoke` CLIコマンドで証明書を失効させ、ストアのステータスも更新する
   revokeCertificate(serialNumber: string): void {
     this.withPassFile(passFile => {
       execFileSync('step', [
@@ -195,6 +186,7 @@ export class StepCAClient {
         '--provisioner-password-file', passFile,
       ], { encoding: 'utf-8', timeout: 15000 })
     })
+    updateCertStatus(serialNumber, 'revoked')
   }
 
   // プロビジョナー一覧は認証不要の /1.0/provisioners で取得する
