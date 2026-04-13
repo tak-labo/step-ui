@@ -20,10 +20,16 @@ export async function POST(_request: Request, { params }: Params) {
 
     if (!cert) return NextResponse.json({ error: '証明書が見つかりません' }, { status: 404 })
 
+    // 元の証明書と同じ有効期間で更新する
+    const originalDurationH = Math.round(
+      (new Date(cert.notAfter).getTime() - new Date(cert.notBefore).getTime()) / 3600000
+    )
+    const duration = `${originalDurationH}h`
+
     const result = await client.generateCertificate(
       cert.commonName,
       cert.sans.filter(s => s !== cert.commonName),
-      '8760h'
+      duration
     )
 
     return NextResponse.json(result)

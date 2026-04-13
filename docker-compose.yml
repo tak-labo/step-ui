@@ -24,6 +24,8 @@ services:
             --provisioner "admin" \
             --password-file /home/step/password \
             --deployment-type standalone
+          # プロビジョナーの最大証明書有効期間を10年に変更
+          sed -i 's/"maxTLSCertDuration": "24h"/"maxTLSCertDuration": "87600h"/g' /home/step/config/ca.json
         fi
         exec step-ca /home/step/config/ca.json --password-file /home/step/password
     healthcheck:
