@@ -25,6 +25,8 @@ services:
             --password-file /home/step/password
           # プロビジョナーの最大証明書有効期間を10年に変更
           sed -i 's/"maxTLSCertDuration": "24h"/"maxTLSCertDuration": "87600h"/g' /home/step/config/ca.json
+          # admin APIを有効化（プロビジョナー管理に必要）
+          sed -i 's/"authority": {/"authority": {\n\t\t"enableAdmin": true,/' /home/step/config/ca.json
         fi
         exec step-ca /home/step/config/ca.json --password-file /home/step/password
     healthcheck:
