@@ -37,16 +37,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'hostnameは必須です' }, { status: 400 })
   }
 
-  const hostnameRegex = /^[a-zA-Z0-9._-]+$/
+  // RFC1123: hostnameは最大253文字
+  const hostnameRegex = /^[a-zA-Z0-9._-]{1,253}$/
   if (!hostnameRegex.test(hostname)) {
-    return NextResponse.json({ error: 'hostnameが不正です' }, { status: 400 })
+    return NextResponse.json({ error: 'hostnameが不正です（英数字・ドット・ハイフン・アンダースコア、253文字以内）' }, { status: 400 })
+  }
+
+  // SANsのバリデーション（ホスト名またはIPアドレス）
+  const sanList = Array.isArray(sans) ? sans : []
+  const hostnameOrIpRegex = /^[a-zA-Z0-9._-]{1,253}$|^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/
+  for (const san of sanList) {
+    if (typeof san !== 'string' || !hostnameOrIpRegex.test(san)) {
+      return NextResponse.json({ error: `SANが不正です: ${String(san).slice(0, 50)}` }, { status: 400 })
+    }
   }
 
   try {
     const client = getStepCAClient()
     const result = await client.generateCertificate(
       hostname,
-      Array.isArray(sans) ? sans : [],
+      sanList,
       duration ?? '24h'
     )
     return NextResponse.json(result)
