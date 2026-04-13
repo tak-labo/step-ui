@@ -15,7 +15,7 @@ export default async function CertificatesPage() {
 
   try {
     const client = getStepCAClient()
-    certificates = await client.listCertificates()
+    certificates = client.listCertificates()
   } catch (e) {
     error = e instanceof Error ? e.message : '証明書の取得に失敗しました'
   }
@@ -27,6 +27,15 @@ export default async function CertificatesPage() {
         <Link href="/certificates/new">
           <Button>新規証明書を発行</Button>
         </Link>
+      </div>
+
+      <div className="flex gap-3 mb-6">
+        <a href="/api/ca-certs?type=root" download="root_ca.crt">
+          <Button variant="outline" size="sm">Root CA ダウンロード</Button>
+        </a>
+        <a href="/api/ca-certs?type=intermediate" download="intermediate_ca.crt">
+          <Button variant="outline" size="sm">Intermediate CA ダウンロード</Button>
+        </a>
       </div>
 
       {error ? (
