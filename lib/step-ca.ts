@@ -208,11 +208,18 @@ export class StepCAClient {
   createAcmeProvisioner(name: string): void {
     const caConfigPath = '/home/step/config/ca.json'
     const caConfig = JSON.parse(readFileSync(caConfigPath, 'utf-8'))
-    const provisioners: Array<{ type: string; name: string }> = caConfig.authority?.provisioners ?? []
-    if (provisioners.some(p => p.name === name)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const provisioners: any[] = caConfig.authority?.provisioners ?? []
+    if (provisioners.some((p: { name: string }) => p.name === name)) {
       throw new Error(`プロビジョナー "${name}" は既に存在します`)
     }
-    provisioners.push({ type: 'ACME', name })
+    provisioners.push({
+      type: 'ACME',
+      name,
+      forceCN: false,
+      claims: { enableSSHCA: false },
+      options: { x509: {}, ssh: {} },
+    })
     caConfig.authority = { ...caConfig.authority, provisioners }
     writeFileSync(caConfigPath, JSON.stringify(caConfig, null, 2))
     execFileSync('docker', ['restart', 'step-ca'], { encoding: 'utf-8', timeout: 60000 })
@@ -222,10 +229,11 @@ export class StepCAClient {
   deleteProvisioner(name: string): void {
     const caConfigPath = '/home/step/config/ca.json'
     const caConfig = JSON.parse(readFileSync(caConfigPath, 'utf-8'))
-    const provisioners: Array<{ type: string; name: string }> = caConfig.authority?.provisioners ?? []
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const provisioners: any[] = caConfig.authority?.provisioners ?? []
     caConfig.authority = {
       ...caConfig.authority,
-      provisioners: provisioners.filter(p => p.name !== name),
+      provisioners: provisioners.filter((p: { name: string }) => p.name !== name),
     }
     writeFileSync(caConfigPath, JSON.stringify(caConfig, null, 2))
     execFileSync('docker', ['restart', 'step-ca'], { encoding: 'utf-8', timeout: 60000 })
