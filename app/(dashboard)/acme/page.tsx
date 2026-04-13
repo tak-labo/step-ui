@@ -17,6 +17,7 @@ export default function AcmePage() {
   const [provisioners, setProvisioners] = useState<Provisioner[]>([])
   const [newName, setNewName] = useState('')
   const [loading, setLoading] = useState(false)
+  const [deletingName, setDeletingName] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const caUrl = process.env.NEXT_PUBLIC_CA_URL ?? 'https://step-ca:9000'
@@ -67,6 +68,7 @@ export default function AcmePage() {
 
   async function handleDelete(name: string) {
     if (!window.confirm(`「${name}」を削除しますか？`)) return
+    setDeletingName(name)
     setError('')
     try {
       const res = await fetch('/api/acme', {
@@ -82,6 +84,8 @@ export default function AcmePage() {
       await loadProvisioners()
     } catch {
       setError('通信エラーが発生しました')
+    } finally {
+      setDeletingName(null)
     }
   }
 
@@ -110,8 +114,9 @@ export default function AcmePage() {
                       variant="destructive"
                       size="sm"
                       onClick={() => handleDelete(prov.name)}
+                      disabled={deletingName !== null}
                     >
-                      削除
+                      {deletingName === prov.name ? '削除中...' : '削除'}
                     </Button>
                   </div>
                 </div>
