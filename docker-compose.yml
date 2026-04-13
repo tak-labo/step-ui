@@ -47,6 +47,7 @@ services:
         condition: service_healthy
     volumes:
       - step-data:/home/step:ro
+      - cert-store:/app/data
     environment:
       - CA_URL=${CA_URL}
       - CA_FINGERPRINT=${CA_FINGERPRINT}
@@ -64,6 +65,7 @@ services:
 
 volumes:
   step-data:
+  cert-store:
 
 networks:
   step-network:

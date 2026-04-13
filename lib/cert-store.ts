@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { CertificateInfo } from './step-ca'
 
-// 永続ボリューム（/home/step）に保存することでコンテナ再起動後も維持される
-const STORE_PATH = '/home/step/step-ui-certs.json'
+// /app/data は docker-compose.yml で cert-store ボリュームをマウントする書き込み可能な領域
+const STORE_PATH = '/app/data/certs.json'
 
 export function loadCerts(): CertificateInfo[] {
   try {
