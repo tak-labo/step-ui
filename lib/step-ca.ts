@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import * as x509 from '@peculiar/x509'
 import { execFileSync } from 'child_process'
-import { writeFileSync, unlinkSync } from 'fs'
+import { readFileSync, writeFileSync, unlinkSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
@@ -202,32 +202,32 @@ export class StepCAClient {
     return data.provisioners.map(p => ({ name: p.name, type: p.type, details: p }))
   }
 
-  // step CLI のオフラインモードで ca.json を直接書き換えて ACME プロビジョナーを追加し、
-  // Docker CLI で step-ca を再起動して変更を反映させる。
+  // ca.json を直接編集して ACME プロビジョナーを追加し、step-ca を再起動する。
   // admin API は step-ca 0.27.4 スタンドアロンでは x5c 認証を要求するため使用不可。
+  // step ca provisioner add に --offline フラグは存在しないため直接編集方式を採用。
   createAcmeProvisioner(name: string): void {
-    execFileSync('step', [
-      'ca', 'provisioner', 'add', name,
-      '--type', 'ACME',
-      '--offline',
-    ], {
-      encoding: 'utf-8',
-      timeout: 15000,
-      env: { ...process.env, STEPPATH: '/home/step' },
-    })
+    const caConfigPath = '/home/step/config/ca.json'
+    const caConfig = JSON.parse(readFileSync(caConfigPath, 'utf-8'))
+    const provisioners: Array<{ type: string; name: string }> = caConfig.authority?.provisioners ?? []
+    if (provisioners.some(p => p.name === name)) {
+      throw new Error(`プロビジョナー "${name}" は既に存在します`)
+    }
+    provisioners.push({ type: 'ACME', name })
+    caConfig.authority = { ...caConfig.authority, provisioners }
+    writeFileSync(caConfigPath, JSON.stringify(caConfig, null, 2))
     execFileSync('docker', ['restart', 'step-ca'], { encoding: 'utf-8', timeout: 60000 })
   }
 
-  // step CLI のオフラインモードでプロビジョナーを削除し、step-ca を再起動する
+  // ca.json からプロビジョナーを削除し、step-ca を再起動する
   deleteProvisioner(name: string): void {
-    execFileSync('step', [
-      'ca', 'provisioner', 'remove', name,
-      '--offline',
-    ], {
-      encoding: 'utf-8',
-      timeout: 15000,
-      env: { ...process.env, STEPPATH: '/home/step' },
-    })
+    const caConfigPath = '/home/step/config/ca.json'
+    const caConfig = JSON.parse(readFileSync(caConfigPath, 'utf-8'))
+    const provisioners: Array<{ type: string; name: string }> = caConfig.authority?.provisioners ?? []
+    caConfig.authority = {
+      ...caConfig.authority,
+      provisioners: provisioners.filter(p => p.name !== name),
+    }
+    writeFileSync(caConfigPath, JSON.stringify(caConfig, null, 2))
     execFileSync('docker', ['restart', 'step-ca'], { encoding: 'utf-8', timeout: 60000 })
   }
 
