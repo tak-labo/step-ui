@@ -19,6 +19,17 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: 'リクエストボディが不正です' }, { status: 400 })
   }
 
+  // PEMフィールドの最大サイズチェック（16KB）
+  const MAX_PEM_SIZE = 16 * 1024
+  if (
+    typeof body.certificate !== 'string' ||
+    typeof body.privateKey !== 'string' ||
+    body.certificate.length > MAX_PEM_SIZE ||
+    body.privateKey.length > MAX_PEM_SIZE
+  ) {
+    return NextResponse.json({ error: 'PEMデータが不正または大きすぎます' }, { status: 400 })
+  }
+
   if (body.format === 'pem') {
     const pemBundle = `${body.certificate}\n${body.privateKey}`
     return new Response(pemBundle, {

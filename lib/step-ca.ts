@@ -231,6 +231,13 @@ export class StepCAClient {
     return `${this.config.caUrl}/acme/${encodeURIComponent(provisionerName)}/directory`
   }
 
+  // NOTE: step-caのAdmin APIは実際には/admin/tokenというエンドポイントを持ちません。
+  // 正確な認証フローはstep-caのバージョンと設定に依存します。
+  // 本番環境では以下のいずれかの方法でAdmin APIを認証する必要があります：
+  // 1. ステップCLI経由でOTTを取得: `step ca token --admin-provisioner <prov> <subject>`
+  // 2. 管理者クライアント証明書を使用
+  // 3. step-ca Management API Provisioner Keyを使って直接JWTを署名
+  // 現在の実装はstep-caとの接続テスト後に修正が必要です。
   private async getAdminToken(): Promise<string> {
     const res = await this.fetchCA('/admin/token', {
       method: 'POST',
