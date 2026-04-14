@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
 import { readFileSync } from 'fs'
 
 export async function GET(request: Request) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
-
   const { searchParams } = new URL(request.url)
   const type = searchParams.get('type')
 

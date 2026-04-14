@@ -61,8 +61,12 @@ nginx の証明書は step-ca から直接発行します。必要なら step-ca
 
 - **nginx の入口証明書**: `docker compose up --force-recreate nginx-cert-bootstrap nginx` で再発行します。
 - **step-ui で発行した証明書**: 証明書詳細画面の「証明書を更新」を使います。更新は元の有効期限を引き継ぎます。
-- 発行時の PEM は `cert-store` にも保存するので、詳細画面の PEM ダウンロードが使えます。
+- 発行時の PEM は `cert-store` にも保存するので、詳細画面で証明書(.crt) / 鍵(.key) / 一体型(.pem) を選べます。
 - 失効した証明書は一覧・詳細から削除できます。active な証明書は削除できません。
+- Root / Intermediate CA 証明書は認証なしで取得できます。
+  - 直接アクセス: `curl -OJ "http://localhost:3000/api/ca-certs?type=root"`
+  - nginx 経由: `curl -k -OJ "https://localhost/api/ca-certs?type=root"`
+  - intermediate も同様に `type=intermediate` を指定します
 
 ### ACME プロビジョナーの表示
 

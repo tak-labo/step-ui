@@ -57,8 +57,7 @@ export function CertForm() {
       }
 
       const data = await res.json() as { certificate: string; privateKey: string }
-      downloadFile(`${hostname}.crt`, data.certificate)
-      downloadFile(`${hostname}.key`, data.privateKey)
+      downloadFile(`${hostname}.pem`, `${data.certificate}\n${data.privateKey}`)
 
       router.push('/certificates')
     } catch {

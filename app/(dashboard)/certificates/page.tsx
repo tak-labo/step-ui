@@ -38,6 +38,18 @@ export default async function CertificatesPage() {
         </a>
       </div>
 
+      <div className="mb-6 rounded border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+        <p className="font-medium mb-2">CA証明書 endpoint</p>
+        <div className="space-y-2 font-mono text-xs">
+          <div>/api/ca-certs?type=root</div>
+          <div className="text-gray-500">curl -OJ &quot;http://localhost:3000/api/ca-certs?type=root&quot;</div>
+          <div className="text-gray-500">curl -k -OJ &quot;https://localhost/api/ca-certs?type=root&quot;</div>
+          <div className="pt-2">/api/ca-certs?type=intermediate</div>
+          <div className="text-gray-500">curl -OJ &quot;http://localhost:3000/api/ca-certs?type=intermediate&quot;</div>
+          <div className="text-gray-500">curl -k -OJ &quot;https://localhost/api/ca-certs?type=intermediate&quot;</div>
+        </div>
+      </div>
+
       {error ? (
         <div className="bg-red-50 border border-red-200 rounded p-4 text-red-700">
           <p className="font-medium">エラー</p>

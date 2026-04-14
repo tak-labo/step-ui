@@ -25,7 +25,9 @@ export function CertActions({ certificate, certPem, keyPem }: CertActionsProps) 
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState('')
   const router = useRouter()
-  const hasPemBundle = Boolean(certPem && keyPem)
+  const hasCertPem = Boolean(certPem)
+  const hasKeyPem = Boolean(keyPem)
+  const hasPemBundle = hasCertPem && hasKeyPem
 
   async function handleRevoke() {
     setLoading('revoke')
@@ -86,8 +88,7 @@ export function CertActions({ certificate, certPem, keyPem }: CertActionsProps) 
         return
       }
       const data = await res.json() as { certificate: string; privateKey: string }
-      downloadFile(`${certificate.commonName}.crt`, data.certificate)
-      downloadFile(`${certificate.commonName}.key`, data.privateKey)
+      downloadPem(`${certificate.commonName}.pem`, data.certificate, data.privateKey)
       router.refresh()
     } catch {
       setError('通信エラーが発生しました')
@@ -97,12 +98,22 @@ export function CertActions({ certificate, certPem, keyPem }: CertActionsProps) 
   }
 
   function handleDownloadPem() {
-    if (!certPem || !keyPem) {
-      setError('証明書データが利用できません。再発行してください')
-      return
-    }
+    if (!hasPemBundle || !certPem || !keyPem) return setMissingPemError()
+    downloadPem(`${certificate.commonName}.pem`, certPem, keyPem)
+  }
+
+  function handleDownloadCertificate() {
+    if (!hasCertPem || !certPem) return setMissingPemError()
     downloadFile(`${certificate.commonName}.crt`, certPem)
+  }
+
+  function handleDownloadPrivateKey() {
+    if (!hasKeyPem || !keyPem) return setMissingPemError()
     downloadFile(`${certificate.commonName}.key`, keyPem)
+  }
+
+  function setMissingPemError() {
+    setError('証明書データが利用できません。再発行してください')
   }
 
   function downloadFile(filename: string, content: string) {
@@ -115,6 +126,10 @@ export function CertActions({ certificate, certPem, keyPem }: CertActionsProps) 
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+  }
+
+  function downloadPem(filename: string, certificate: string, privateKey: string) {
+    downloadFile(filename, `${certificate}\n${privateKey}`)
   }
 
   return (
@@ -136,10 +151,28 @@ export function CertActions({ certificate, certPem, keyPem }: CertActionsProps) 
         <Button
           variant="outline"
           size="sm"
+          onClick={handleDownloadCertificate}
+          disabled={certificate.status !== 'active' || !hasCertPem}
+        >
+          {hasCertPem ? '証明書(.crt)' : '証明書未保存'}
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDownloadPrivateKey}
+          disabled={certificate.status !== 'active' || !hasKeyPem}
+        >
+          {hasKeyPem ? '鍵(.key)' : '鍵未保存'}
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
           onClick={handleDownloadPem}
           disabled={certificate.status !== 'active' || !hasPemBundle}
         >
-          {hasPemBundle ? 'PEMダウンロード' : 'PEM未保存'}
+          {hasPemBundle ? '一体型(.pem)' : '一体型未保存'}
         </Button>
 
         <Button

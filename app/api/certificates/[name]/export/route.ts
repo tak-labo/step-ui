@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: Params) {
   const { name } = await params
   const hostname = decodeURIComponent(name)
 
-  let body: { certificate: string; privateKey: string; format: 'pem' | 'pfx' }
+  let body: { certificate: string; privateKey: string; format: 'cert' | 'key' | 'pem' | 'pfx' }
   try {
     body = await request.json()
   } catch {
@@ -30,12 +30,19 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: 'PEMデータが不正または大きすぎます' }, { status: 400 })
   }
 
-  if (body.format === 'pem') {
-    const pemBundle = `${body.certificate}\n${body.privateKey}`
-    return new Response(pemBundle, {
+  if (body.format === 'cert' || body.format === 'key' || body.format === 'pem') {
+    const content = body.format === 'cert'
+      ? body.certificate
+      : body.format === 'key'
+        ? body.privateKey
+        : `${body.certificate}\n${body.privateKey}`
+
+    const extension = body.format === 'cert' ? 'crt' : body.format === 'key' ? 'key' : 'pem'
+
+    return new Response(content, {
       headers: {
         'Content-Type': 'application/x-pem-file',
-        'Content-Disposition': `attachment; filename="${hostname}.pem"`,
+        'Content-Disposition': `attachment; filename="${hostname}.${extension}"`,
       },
     })
   }
