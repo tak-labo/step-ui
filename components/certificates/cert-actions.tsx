@@ -21,9 +21,11 @@ interface CertActionsProps {
 
 export function CertActions({ certificate, certPem, keyPem }: CertActionsProps) {
   const [revokeOpen, setRevokeOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState('')
   const router = useRouter()
+  const hasPemBundle = Boolean(certPem && keyPem)
 
   async function handleRevoke() {
     setLoading('revoke')
@@ -39,6 +41,28 @@ export function CertActions({ certificate, certPem, keyPem }: CertActionsProps) 
         return
       }
       setRevokeOpen(false)
+      router.push('/certificates')
+      router.refresh()
+    } catch {
+      setError('通信エラーが発生しました')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  async function handleDelete() {
+    setLoading('delete')
+    setError('')
+    try {
+      const res = await fetch(`/api/certificates/${encodeURIComponent(certificate.serialNumber)}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const data = await res.json() as { error: string }
+        setError(data.error)
+        return
+      }
+      setDeleteOpen(false)
       router.push('/certificates')
       router.refresh()
     } catch {
@@ -113,9 +137,9 @@ export function CertActions({ certificate, certPem, keyPem }: CertActionsProps) 
           variant="outline"
           size="sm"
           onClick={handleDownloadPem}
-          disabled={certificate.status !== 'active'}
+          disabled={certificate.status !== 'active' || !hasPemBundle}
         >
-          PEMダウンロード
+          {hasPemBundle ? 'PEMダウンロード' : 'PEM未保存'}
         </Button>
 
         <Button
@@ -125,6 +149,15 @@ export function CertActions({ certificate, certPem, keyPem }: CertActionsProps) 
           disabled={loading !== null || certificate.status !== 'active'}
         >
           証明書を失効
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setDeleteOpen(true)}
+          disabled={loading !== null || certificate.status !== 'revoked'}
+        >
+          証明書を削除
         </Button>
       </div>
 
@@ -146,6 +179,29 @@ export function CertActions({ certificate, certPem, keyPem }: CertActionsProps) 
               disabled={loading === 'revoke'}
             >
               {loading === 'revoke' ? '処理中...' : '失効する'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>証明書を削除しますか？</DialogTitle>
+            <DialogDescription>
+              削除できるのは失効済み証明書のみです。「{certificate.commonName}」を一覧から完全に消します。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+              キャンセル
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={loading === 'delete'}
+            >
+              {loading === 'delete' ? '削除中...' : '削除する'}
             </Button>
           </DialogFooter>
         </DialogContent>

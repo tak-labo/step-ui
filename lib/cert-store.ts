@@ -33,3 +33,15 @@ export function updateCertStatus(serialNumber: string, status: CertificateInfo['
     writeFileSync(STORE_PATH, JSON.stringify(certs, null, 2))
   }
 }
+
+export function removeCert(serialNumber: string): boolean {
+  const certs = loadCerts()
+  const nextCerts = certs.filter(c => c.serialNumber !== serialNumber)
+
+  if (nextCerts.length === certs.length) {
+    return false
+  }
+
+  writeFileSync(STORE_PATH, JSON.stringify(nextCerts, null, 2))
+  return true
+}

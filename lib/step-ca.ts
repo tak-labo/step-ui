@@ -28,6 +28,8 @@ export interface CertificateInfo {
   notAfter: string
   sans: string[]
   status: 'active' | 'revoked' | 'expired'
+  certificatePem?: string
+  privateKeyPem?: string
 }
 
 export interface GenerateCertResult {
@@ -153,6 +155,8 @@ export class StepCAClient {
         notAfter: parsed.notAfter.toISOString(),
         sans: subject.sans,
         status: 'active',
+        certificatePem: data.crt,
+        privateKeyPem,
       })
     } catch { /* メタデータ保存失敗は無視 */ }
 

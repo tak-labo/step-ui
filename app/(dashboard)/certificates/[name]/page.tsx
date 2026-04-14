@@ -86,7 +86,11 @@ export default async function CertDetailPage({ params }: Props) {
           <CardTitle>操作</CardTitle>
         </CardHeader>
         <CardContent>
-          <CertActions certificate={cert} />
+          <CertActions
+            certificate={cert}
+            certPem={cert.certificatePem}
+            keyPem={cert.privateKeyPem}
+          />
         </CardContent>
       </Card>
     </div>
