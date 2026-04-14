@@ -6,6 +6,8 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
 import { loadCerts, saveCert, updateCertStatus } from './cert-store'
+import { DEFAULT_CERT_DURATION } from './cert-duration'
+import type { AcmeProvisioner } from './acme-provisioner'
 
 export interface StepCAConfig {
   caUrl: string
@@ -45,7 +47,7 @@ export class StepCAClient {
 
   parseDuration(duration: string): string {
     const valid = /^\d+(h|d|m|y)$/.test(duration)
-    return valid ? duration : '24h'
+    return valid ? duration : DEFAULT_CERT_DURATION
   }
 
   private async fetchCA(path: string, options: RequestInit = {}): Promise<Response> {
@@ -204,7 +206,7 @@ export class StepCAClient {
   }
 
   // プロビジョナー一覧は認証不要の /1.0/provisioners で取得する
-  async listProvisioners(): Promise<Array<{ name: string; type: string; details: unknown }>> {
+  async listProvisioners(): Promise<AcmeProvisioner[]> {
     const res = await this.fetchCA('/1.0/provisioners')
 
     if (!res.ok) {
@@ -212,8 +214,8 @@ export class StepCAClient {
       throw new Error(`プロビジョナー一覧取得失敗: ${err}`)
     }
 
-    const data = await res.json() as { provisioners: Array<{ name: string; type: string }> }
-    return data.provisioners.map(p => ({ name: p.name, type: p.type, details: p }))
+    const data = await res.json() as { provisioners: AcmeProvisioner[] }
+    return data.provisioners
   }
 
   private withAdminCert<T>(fn: (adminCert: string, adminKey: string) => T): T {
@@ -247,6 +249,16 @@ export class StepCAClient {
       execFileSync('step', [
         'ca', 'provisioner', 'add', name,
         '--type', 'ACME',
+        '--admin-cert', adminCert,
+        '--admin-key', adminKey,
+        '--ca-url', this.config.caUrl,
+        '--root', '/home/step/certs/root_ca.crt',
+      ], { encoding: 'utf-8', timeout: 15000 })
+      execFileSync('step', [
+        'ca', 'provisioner', 'update', name,
+        '--x509-min-dur=5m',
+        '--x509-max-dur=87600h',
+        '--x509-default-dur=720h',
         '--admin-cert', adminCert,
         '--admin-key', adminKey,
         '--ca-url', this.config.caUrl,

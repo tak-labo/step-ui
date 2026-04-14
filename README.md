@@ -57,6 +57,15 @@ nginx の証明書は step-ca から直接発行します。必要なら step-ca
 
 `/` は step-ui に、`/step-ca/acme/*` は step-ca にルーティングされます。step-ca 自体は外部公開しません。
 
+### 証明書の更新
+
+- **nginx の入口証明書**: `docker compose up --force-recreate nginx-cert-bootstrap nginx` で再発行します。
+- **step-ui で発行した証明書**: 証明書詳細画面の「証明書を更新」を使います。更新は元の有効期限を引き継ぎます。
+
+### ACME プロビジョナーの表示
+
+ACME 管理画面では各 provisioner の `default / min / max` の有効期間を表示します。`step-ca` の provisioner claims に入っていない項目は `未設定` として扱います。
+
 ## ログイン
 
 - URL: http://localhost:3000

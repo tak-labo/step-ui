@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { DEFAULT_CERT_DURATION } from '@/lib/cert-duration'
 import { getStepCAClient } from '@/lib/step-ca'
 
 export async function GET() {
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     const result = await client.generateCertificate(
       hostname,
       sanList,
-      duration ?? '24h'
+      duration ?? DEFAULT_CERT_DURATION
     )
     return NextResponse.json(result)
   } catch (error) {

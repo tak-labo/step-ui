@@ -20,5 +20,5 @@ step ca certificate "$public_domain" /certs/tls.crt /certs/tls.key \
   --root /home/step/certs/root_ca.crt \
   --provisioner "$provisioner_name" \
   --provisioner-password-file "$passfile" \
-  --not-after 24h \
+  --not-after 720h \
   --force

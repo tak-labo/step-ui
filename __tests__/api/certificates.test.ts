@@ -13,8 +13,8 @@ describe('CertificateInfo status logic', () => {
     expect(subject.sans).toEqual(['test.example.com'])
   })
 
-  it('parseDurationが無効な値を24hに変換する', () => {
-    expect(client.parseDuration('')).toBe('24h')
-    expect(client.parseDuration('abc')).toBe('24h')
+  it('parseDurationが無効な値を720hに変換する', () => {
+    expect(client.parseDuration('')).toBe('720h')
+    expect(client.parseDuration('abc')).toBe('720h')
   })
 })

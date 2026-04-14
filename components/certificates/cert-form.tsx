@@ -13,9 +13,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { DEFAULT_CERT_DURATION } from '@/lib/cert-duration'
 
 const DURATION_OPTIONS = [
-  { value: '24h', label: '24時間' },
+  { value: DEFAULT_CERT_DURATION, label: '30日' },
   { value: '168h', label: '1週間' },
   { value: '720h', label: '1ヶ月' },
   { value: '2160h', label: '3ヶ月' },
@@ -27,7 +28,7 @@ const DURATION_OPTIONS = [
 export function CertForm() {
   const [hostname, setHostname] = useState('')
   const [sansInput, setSansInput] = useState('')
-  const [duration, setDuration] = useState('24h')
+  const [duration, setDuration] = useState(DEFAULT_CERT_DURATION)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()

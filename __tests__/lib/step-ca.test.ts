@@ -22,12 +22,12 @@ describe('StepCAClient', () => {
   })
 
   describe('parseDuration', () => {
-    it('24hを正しくパースする', () => {
-      expect(client.parseDuration('24h')).toBe('24h')
+    it('720hを正しくパースする', () => {
+      expect(client.parseDuration('720h')).toBe('720h')
     })
 
-    it('不正な値はデフォルト24hを返す', () => {
-      expect(client.parseDuration('invalid')).toBe('24h')
+    it('不正な値はデフォルト720hを返す', () => {
+      expect(client.parseDuration('invalid')).toBe('720h')
     })
   })
 })

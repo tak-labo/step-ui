@@ -223,7 +223,7 @@ step-ca Admin API は証明書一覧取得にも x5c 認証が必要なため、
 step ca provisioner update admin \
   --x509-min-dur=5m \
   --x509-max-dur=87600h \
-  --x509-default-dur=24h \
+  --x509-default-dur=720h \
   --admin-password-file /home/step/secrets/password \
   --admin-provisioner admin \
   --admin-subject step \
@@ -231,9 +231,19 @@ step ca provisioner update admin \
   --root /home/step/certs/root_ca.crt
 ```
 
+- `defaultTLSCertDuration: 720h` = 30日
 - `maxTLSCertDuration: 87600h` = 10年まで発行可能
 - 更新ロジックは `docker/step-ca-bootstrap.sh` に分離して、`docker-compose.yml` を薄く保つ
 - `nginx` は `.env` の `NGINX_ENABLED=true` で起動し、外向け URL は `PUBLIC_URL` で切り替える
+
+### 6-1. 証明書更新方法
+
+- **nginx の入口証明書**: `docker compose up --force-recreate nginx-cert-bootstrap nginx` で再発行する
+- **step-ui で発行した証明書**: 証明書詳細画面の「証明書を更新」を使う。更新時は元の有効期間をそのまま使う
+
+### 6-2. ACME プロビジョナーの有効期間表示
+
+ACME 管理画面では provisioner の claims から `default / min / max` の有効期間を表示する。claims に値がない場合は `未設定` と表示する。
 
 ### 7. TLS 証明書の信頼
 

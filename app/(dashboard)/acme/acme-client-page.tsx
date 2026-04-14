@@ -6,19 +6,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-
-interface Provisioner {
-  name: string
-  type: string
-  details: unknown
-}
+import type { AcmeProvisioner } from '@/lib/acme-provisioner'
+import { getAcmeDurationFields } from '@/lib/acme-provisioner'
 
 interface AcmeClientPageProps {
   publicBaseUrl: string
 }
 
 export default function AcmeClientPage({ publicBaseUrl }: AcmeClientPageProps) {
-  const [provisioners, setProvisioners] = useState<Provisioner[]>([])
+  const [provisioners, setProvisioners] = useState<AcmeProvisioner[]>([])
   const [newName, setNewName] = useState('')
   const [loading, setLoading] = useState(false)
   const [deletingName, setDeletingName] = useState<string | null>(null)
@@ -33,7 +29,7 @@ export default function AcmeClientPage({ publicBaseUrl }: AcmeClientPageProps) {
         setError(data.error)
         return
       }
-      const data = await res.json() as { provisioners: Provisioner[] }
+      const data = await res.json() as { provisioners: AcmeProvisioner[] }
       setProvisioners(data.provisioners)
     } catch {
       setError('プロビジョナーの取得に失敗しました')
@@ -105,7 +101,10 @@ export default function AcmeClientPage({ publicBaseUrl }: AcmeClientPageProps) {
         {provisioners.length === 0 ? (
           <p className="text-gray-500 text-sm">ACMEプロビジョナーがありません</p>
         ) : (
-          provisioners.map(prov => (
+          provisioners.map(prov => {
+            const durationFields = getAcmeDurationFields(prov)
+
+            return (
             <Card key={prov.name}>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
@@ -125,6 +124,20 @@ export default function AcmeClientPage({ publicBaseUrl }: AcmeClientPageProps) {
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-gray-500 font-medium mb-1">
+                  有効期間:
+                </p>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {durationFields.length === 0 ? (
+                    <span className="text-xs text-gray-400">未設定</span>
+                  ) : (
+                    durationFields.map(field => (
+                      <Badge key={field.label} variant="outline" className="text-xs">
+                        {field.label}: {field.value}
+                      </Badge>
+                    ))
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 font-medium mb-1">
                   certbot等のACMEクライアント用エンドポイント:
                 </p>
                 <code className="text-xs bg-gray-100 p-2 rounded block break-all">
@@ -135,7 +148,8 @@ export default function AcmeClientPage({ publicBaseUrl }: AcmeClientPageProps) {
                 </p>
               </CardContent>
             </Card>
-          ))
+            )
+          })
         )}
       </div>
 
