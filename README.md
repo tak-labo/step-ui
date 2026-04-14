@@ -68,6 +68,15 @@ nginx の証明書は step-ca から直接発行します。必要なら step-ca
   - nginx 経由: `curl -k -OJ "https://localhost/api/ca-certs?type=root"`
   - intermediate も同様に `type=intermediate` を指定します
 
+### CA root のインストール
+
+- **Ubuntu / Debian**
+  1. `sudo cp root_ca.crt /usr/local/share/ca-certificates/root_ca.crt`
+  2. `sudo update-ca-certificates`
+- **RHEL / CentOS / Rocky / AlmaLinux**
+  1. `sudo cp root_ca.crt /etc/pki/ca-trust/source/anchors/root_ca.crt`
+  2. `sudo update-ca-trust extract`
+
 ### ACME プロビジョナーの表示
 
 ACME 管理画面では各 provisioner の `default / min / max` の有効期間を表示します。`step-ca` の provisioner claims に入っていない項目は `未設定` として扱います。
