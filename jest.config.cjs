@@ -1,15 +1,14 @@
-import type { Config } from 'jest'
-
-const config: Config = {
+/** @type {import('jest').Config} */
+const config = {
   testEnvironment: 'node',
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', {}]
+    '^.+\\.tsx?$': ['ts-jest', {}],
   },
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1'
+    '^@/(.*)$': '<rootDir>/$1',
   },
   testMatch: ['**/__tests__/**/*.test.ts'],
   setupFiles: ['reflect-metadata'],
 }
 
-export default config
+module.exports = config
