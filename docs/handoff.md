@@ -6,7 +6,7 @@
 
 - **URL**: `http://localhost:3000`
 - **デフォルト認証**: admin / admin123
-- **本番公開**: `docker compose up --build` で Caddy を入口にし、`.env` の `CADDY_ENABLED=true` で有効化する
+- **本番公開**: `docker compose up --build` で Caddy を入口にし、`.env` の `CADDY_ENABLED=true` と `PUBLIC_DOMAIN=<real host>` で有効化する。ローカル検証は `PUBLIC_DOMAIN=localhost` でも可
 - **Caddy 証明書**: step-ca の ACME provisioner `caddy` から自動取得する
 
 ---
@@ -16,7 +16,7 @@
 ```
 ブラウザ
   ↓ HTTP / HTTPS
-Caddy (CADDY_ENABLED=true 時の公開入口)
+Caddy (CADDY_ENABLED=true 時の公開入口。ローカルは `localhost`、公開は実ホスト名)
   ├── 証明書           → step-ca の ACME provisioner `caddy`
   ├── /                → step-ui
   └── /acme/*          → step-ca

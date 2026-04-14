@@ -89,7 +89,7 @@ services:
     environment:
       - CADDY_ENABLED=${CADDY_ENABLED:-false}
       - CADDY_ACME_PROVISIONER=${CADDY_ACME_PROVISIONER:-caddy}
-      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-localhost}
+      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-}
     volumes:
       - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./docker/caddy-entrypoint.sh:/usr/local/bin/caddy-entrypoint.sh:ro

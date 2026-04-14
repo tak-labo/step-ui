@@ -49,7 +49,7 @@ docker exec step-ca step certificate fingerprint /home/step/certs/root_ca.crt
 docker compose up --build
 ```
 
-`.env` で `CADDY_ENABLED=true` にすると Caddy が起動します。
+`.env` で `CADDY_ENABLED=true` にすると Caddy が起動します。ローカル検証なら `PUBLIC_DOMAIN=localhost`、外部公開なら実ホスト名を設定してください。
 
 `PUBLIC_DOMAIN` は Caddy の受け口です。`PUBLIC_URL` は任意の上書き値で、未設定なら `https://PUBLIC_DOMAIN` を使います。
 
