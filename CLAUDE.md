@@ -53,7 +53,7 @@ Next.js 16 App Router（`output: 'standalone'`）で動作する。ブラウザ 
 
 **`lib/cert-store.ts`** — step-ca の Admin API が x5c 認証必須のため証明書一覧を直接取得できない。代わりに証明書発行時にメタデータを `/app/data/certs.json` に保存し、一覧表示はこのファイルから行う。
 
-**`lib/auth.ts`** — NextAuth v5 Credentials Provider。`UI_PASSWORD_HASH` 環境変数は bcrypt ハッシュを Base64 エンコードした値。Docker Compose が env 値中の `$` を変数展開するため、そのまま設定するとハッシュが破損する。
+**`lib/auth.ts`** — NextAuth v5 Credentials Provider。`UI_PASSWORD_HASH` 環境変数は bcrypt hash を Base64 エンコードした値。Docker Compose が env 値中の `$` を変数展開するため、そのまま設定すると壊れる。
 
 ### 環境変数の注意点
 
@@ -69,7 +69,7 @@ node -e "const b=require('bcryptjs'); b.hash('パスワード',10).then(h=>conso
 |-----------|------|
 | `step-data` | step-ca と step-ui が共有。CA 証明書（`/home/step/certs/`）と設定ファイルを含む |
 | `cert-store` | step-ui 専用書き込み可能領域（`/app/data/certs.json`） |
-| `caddy-data` / `caddy-config` | 本番 proxy profile でのみ使う Caddy の永続データ |
+| `caddy-data` / `caddy-config` | 本番で Caddy を有効化したときに使う永続データ |
 
 `NODE_EXTRA_CA_CERTS=/home/step/certs/root_ca.crt` で step-ca の自己署名 TLS を Node.js が信頼する。
 
@@ -83,7 +83,7 @@ step-ui コンテナの runner ステージは `node:20-slim`（Debian）。step
 - `enableAdmin: true` が ca.json に設定され、プロビジョナー設定は DB 管理になる（ca.json の `provisioners` 配列を直接編集しても反映されない）
 
 Docker Compose は `DOCKER_STEPCA_INIT_*` で初期化し、claims の調整だけを `step-ca-bootstrap` の one-shot ジョブで行う。
-本番公開では `docker compose --profile proxy up --build` で Caddy を入口にし、`PUBLIC_URL` が未設定なら `https://${PUBLIC_DOMAIN}` を step-ui の外向け URL に使う。
+本番公開では `docker compose up --build` で Caddy を入口にし、`.env` の `CADDY_ENABLED=true` で有効化する。`PUBLIC_URL` が未設定なら `https://${PUBLIC_DOMAIN}` を step-ui の外向け URL に使う。
 同じ bootstrap ジョブで `caddy` 用 ACME provisioner も作成し、Caddy の証明書も step-ca から取得する。
 
 プロビジョナー追加・削除は `withAdminCert` 経由で `step ca provisioner add/remove --admin-cert --admin-key` を使う。

@@ -7,7 +7,7 @@ services:
     volumes:
       - step-data:/home/step
     environment:
-      - DOCKER_STEPCA_INIT_NAME=Step CA
+      - DOCKER_STEPCA_INIT_NAME=${DOCKER_STEPCA_INIT_NAME:-Step CA}
       - DOCKER_STEPCA_INIT_DNS_NAMES=step-ca,localhost
       - DOCKER_STEPCA_INIT_PROVISIONER_NAME=admin
       - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
@@ -76,8 +76,6 @@ services:
   caddy:
     image: caddy:2-alpine
     container_name: step-ui-caddy
-    profiles:
-      - proxy
     depends_on:
       step-ca:
         condition: service_healthy
@@ -89,13 +87,18 @@ services:
       - "80:80"
       - "443:443"
     environment:
+      - CADDY_ENABLED=${CADDY_ENABLED:-false}
       - CADDY_ACME_PROVISIONER=${CADDY_ACME_PROVISIONER:-caddy}
       - PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-localhost}
     volumes:
       - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./docker/caddy-entrypoint.sh:/usr/local/bin/caddy-entrypoint.sh:ro
       - step-data:/home/step:ro
       - caddy-data:/data
       - caddy-config:/config
+    entrypoint:
+      - /bin/sh
+      - /usr/local/bin/caddy-entrypoint.sh
     networks:
       - step-network
 

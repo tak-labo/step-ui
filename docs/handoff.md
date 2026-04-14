@@ -6,7 +6,7 @@
 
 - **URL**: `http://localhost:3000`
 - **デフォルト認証**: admin / admin123
-- **本番公開**: `docker compose --profile proxy up --build` で Caddy を入口にし、`/` を step-ui、`/acme/*` を step-ca に振り分ける
+- **本番公開**: `docker compose up --build` で Caddy を入口にし、`.env` の `CADDY_ENABLED=true` で有効化する
 - **Caddy 証明書**: step-ca の ACME provisioner `caddy` から自動取得する
 
 ---
@@ -16,7 +16,7 @@
 ```
 ブラウザ
   ↓ HTTP / HTTPS
-Caddy (proxy profile 時の公開入口)
+Caddy (CADDY_ENABLED=true 時の公開入口)
   ├── 証明書           → step-ca の ACME provisioner `caddy`
   ├── /                → step-ui
   └── /acme/*          → step-ca
@@ -85,14 +85,16 @@ step-ca コンテナ (smallstep/step-ca:latest)
 
 ```env
 # step-ca 接続情報
+DOCKER_STEPCA_INIT_NAME=Step CA
 CA_URL=https://step-ca:9000
 CA_FINGERPRINT=<フィンガープリント>
 CA_PROVISIONER=admin
 # step-ui は Compose 内で DOCKER_STEPCA_INIT_PASSWORD をそのまま使う
 
-# 本番で Caddy の proxy profile を使う場合
+# 本番で Caddy を使う場合
 PUBLIC_DOMAIN=<domain>
 PUBLIC_URL=https://<domain>
+CADDY_ENABLED=true
 CADDY_ACME_PROVISIONER=caddy
 # PUBLIC_URL は任意。未設定なら https://PUBLIC_DOMAIN を使う
 
@@ -103,7 +105,7 @@ AUTH_TRUST_HOST=true
 
 # UI ログイン
 UI_USERNAME=admin
-# bcrypt ハッシュを Base64 エンコードした値（下記「パスワード変更方法」参照）
+# bcrypt hash を Base64 エンコードした値（下記「パスワード変更方法」参照）
 UI_PASSWORD_HASH=<Base64(bcrypt(パスワード))>
 
 # フロントエンド用
@@ -121,7 +123,7 @@ node -e "const b=require('bcryptjs'); b.hash('新パスワード',10).then(h=>co
 
 出力された文字列を `UI_PASSWORD_HASH` に設定する。
 
-**なぜ Base64 エンコードするか**: Docker Compose は env ファイルの値中の `$` を変数展開する。bcrypt ハッシュには `$2b$10$...` のような `$` が含まれるため、そのまま設定するとハッシュが破損する。Base64 に変換して `$` を除去し、`lib/auth.ts` で `Buffer.from(hashB64, 'base64').toString()` でデコードしている。
+**なぜ Base64 エンコードするか**: Docker Compose は env ファイルの値中の `$` を変数展開する。bcrypt hash には `$2b$10$...` のような `$` が含まれるため、そのまま設定すると壊れる。Base64 に変換して `$` を除去し、`lib/auth.ts` で `Buffer.from(hashB64, 'base64').toString()` でデコードしている。
 
 ---
 
@@ -137,9 +139,6 @@ docker compose up --build
 
 # バックグラウンド起動
 docker compose up --build -d
-
-# 本番公開（reverse proxy）
-docker compose --profile proxy up --build -d
 ```
 
 ### 初回起動時の注意
@@ -236,7 +235,7 @@ step ca provisioner update admin \
 
 - `maxTLSCertDuration: 87600h` = 10年まで発行可能
 - 更新ロジックは `docker/step-ca-bootstrap.sh` に分離して、`docker-compose.yml` を薄く保つ
-- `caddy` は `--profile proxy` のときだけ起動し、外向け URL は `PUBLIC_URL` で切り替える
+- `caddy` は `.env` の `CADDY_ENABLED=true` で起動し、外向け URL は `PUBLIC_URL` で切り替える
 
 ### 7. TLS 証明書の信頼
 
@@ -263,7 +262,7 @@ volumes:
 | step CLI 0.27.4 で `--provisioner "Admin JWK"` エラー | スペースを含むプロビジョナー名を `--issuer` として扱うバグ | step CLI **0.28.7** にアップグレード（CHANGELOG で修正を確認）|
 | Alpine で step CLI 動作せず | glibc vs musl 非互換 | runner を `node:20-slim` (Debian) に変更 |
 | `reflect-metadata` エラー | @peculiar/x509 の依存 | `lib/step-ca.ts` 先頭に `import 'reflect-metadata'` |
-| bcrypt ハッシュが Docker Compose で破損 | `$` 文字の変数展開 | Base64 エンコードで回避 |
+| bcrypt hash が Docker Compose で壊れる | `$` 文字の変数展開 | Base64 エンコードで回避 |
 | AUTH_TRUST_HOST エラー | NextAuth v5 の要件 | `docker-compose.yml` に `AUTH_TRUST_HOST=true` を追加 |
 | root_ca.crt が見つからない | step-ui に step-data ボリューム未マウント | `step-data:/home/step` を step-ui にも追加 |
 | cert-store 書き込みエラー | step-data を :ro でマウント | 書き込み専用の `cert-store` ボリューム (`/app/data`) を別途追加 |
