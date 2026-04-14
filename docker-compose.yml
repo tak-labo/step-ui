@@ -1,6 +1,6 @@
 services:
   step-ca:
-    image: smallstep/step-ca:0.27.4
+    image: smallstep/step-ca:latest
     container_name: step-ca
     ports:
       - "9000:9000"
@@ -22,11 +22,12 @@ services:
             --dns "step-ca,localhost" \
             --address ":9000" \
             --provisioner "admin" \
-            --password-file /home/step/password
+            --password-file /home/step/password \
+            --remote-management
           # authority.claims をグローバルに設定して最大証明書有効期間を10年に拡張する。
-          # step ca init はプロビジョナーの claims を ca.json に書き出さないため
-          # authority 直下に挿入することで全プロビジョナーのデフォルト上限を設定する。
-          # enableAdmin は設定しない（DB管理になると ca.json 直接編集が無効になる）。
+          # --remote-management により enableAdmin: true が自動設定される。
+          # provisioner の claims は step CLI 0.28.7 + admin cert で更新可能だが、
+          # グローバル上限は authority.claims でも設定できるため sed で挿入する。
           sed -i 's/"authority": {/"authority": {\n\t\t"claims": {"minTLSCertDuration": "5m", "maxTLSCertDuration": "87600h", "defaultTLSCertDuration": "24h"},/' /home/step/config/ca.json
         fi
         exec step-ca /home/step/config/ca.json --password-file /home/step/password

@@ -20,7 +20,7 @@ ENV NODE_ENV=production
 # GitHub releasesから取得し、findで実行ファイルを探してインストール
 RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates docker.io \
     && rm -rf /var/lib/apt/lists/* \
-    && wget -q https://github.com/smallstep/cli/releases/download/v0.27.4/step_linux_amd64.tar.gz -O /tmp/step.tar.gz \
+    && wget -q https://github.com/smallstep/cli/releases/download/v0.28.7/step_linux_amd64.tar.gz -O /tmp/step.tar.gz \
     && tar xzf /tmp/step.tar.gz -C /tmp \
     && find /tmp -name step -type f -executable | head -1 | xargs -I{} mv {} /usr/local/bin/step \
     && chmod +x /usr/local/bin/step \
