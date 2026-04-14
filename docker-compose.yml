@@ -81,12 +81,15 @@ services:
     depends_on:
       step-ca:
         condition: service_healthy
+      step-ca-bootstrap:
+        condition: service_completed_successfully
       step-ui:
         condition: service_started
     ports:
       - "80:80"
       - "443:443"
     environment:
+      - CADDY_ACME_PROVISIONER=${CADDY_ACME_PROVISIONER:-caddy}
       - PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-localhost}
     volumes:
       - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro

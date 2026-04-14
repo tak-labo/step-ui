@@ -7,6 +7,7 @@
 - **URL**: `http://localhost:3000`
 - **デフォルト認証**: admin / admin123
 - **本番公開**: `docker compose --profile proxy up --build` で Caddy を入口にし、`/` を step-ui、`/acme/*` を step-ca に振り分ける
+- **Caddy 証明書**: step-ca の ACME provisioner `caddy` から自動取得する
 
 ---
 
@@ -16,6 +17,7 @@
 ブラウザ
   ↓ HTTP / HTTPS
 Caddy (proxy profile 時の公開入口)
+  ├── 証明書           → step-ca の ACME provisioner `caddy`
   ├── /                → step-ui
   └── /acme/*          → step-ca
         ↓ HTTP
@@ -91,6 +93,7 @@ CA_PROVISIONER=admin
 # 本番で Caddy の proxy profile を使う場合
 PUBLIC_DOMAIN=<domain>
 PUBLIC_URL=https://<domain>
+CADDY_ACME_PROVISIONER=caddy
 # PUBLIC_URL は任意。未設定なら https://PUBLIC_DOMAIN を使う
 
 # NextAuth

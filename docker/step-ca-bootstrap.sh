@@ -19,3 +19,27 @@ step ca provisioner update "$provisioner_name" \
   --admin-provisioner "$provisioner_name" \
   --ca-url https://step-ca:9000 \
   --root /home/step/certs/root_ca.crt
+
+if ! step ca provisioner list \
+  --ca-url https://step-ca:9000 \
+  --root /home/step/certs/root_ca.crt \
+  | grep -qw 'caddy'; then
+  admin_cert="/tmp/step-admin-cert-$$-$RANDOM.crt"
+  admin_key="/tmp/step-admin-key-$$-$RANDOM.key"
+  trap 'rm -f "$admin_cert" "$admin_key"' EXIT
+
+  step ca certificate step "$admin_cert" "$admin_key" \
+    --ca-url https://step-ca:9000 \
+    --root /home/step/certs/root_ca.crt \
+    --provisioner "$provisioner_name" \
+    --provisioner-password-file "$passfile" \
+    --not-after 5m \
+    --force
+
+  step ca provisioner add caddy \
+    --type ACME \
+    --admin-cert "$admin_cert" \
+    --admin-key "$admin_key" \
+    --ca-url https://step-ca:9000 \
+    --root /home/step/certs/root_ca.crt
+fi

@@ -84,6 +84,7 @@ step-ui コンテナの runner ステージは `node:20-slim`（Debian）。step
 
 Docker Compose は `DOCKER_STEPCA_INIT_*` で初期化し、claims の調整だけを `step-ca-bootstrap` の one-shot ジョブで行う。
 本番公開では `docker compose --profile proxy up --build` で Caddy を入口にし、`PUBLIC_URL` が未設定なら `https://${PUBLIC_DOMAIN}` を step-ui の外向け URL に使う。
+同じ bootstrap ジョブで `caddy` 用 ACME provisioner も作成し、Caddy の証明書も step-ca から取得する。
 
 プロビジョナー追加・削除は `withAdminCert` 経由で `step ca provisioner add/remove --admin-cert --admin-key` を使う。
 

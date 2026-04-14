@@ -50,6 +50,8 @@ docker compose --profile proxy up --build
 
 `PUBLIC_DOMAIN` は Caddy の受け口です。`PUBLIC_URL` は任意の上書き値で、未設定なら `https://PUBLIC_DOMAIN` を使います。
 
+`caddy` 用の ACME provisioner を step-ca 側で自動作成し、Caddy 自身の証明書も step-ca から取得します。
+
 `/` は step-ui に、`/acme/*` は step-ca にルーティングされます。step-ca 自体は外部公開しません。
 
 ## ログイン

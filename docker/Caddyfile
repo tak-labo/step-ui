@@ -1,9 +1,15 @@
+{
+    cert_issuer acme https://step-ca:9000/acme/{$CADDY_ACME_PROVISIONER}/directory {
+        trusted_roots /home/step/certs/root_ca.crt
+    }
+}
+
 {$PUBLIC_DOMAIN} {
     handle /acme/* {
         reverse_proxy https://step-ca:9000 {
             transport http {
                 tls_server_name step-ca
-                tls_trusted_ca_certs /home/step/certs/root_ca.crt
+                tls_trust_pool file /home/step/certs/root_ca.crt
             }
         }
     }
