@@ -10,6 +10,11 @@ import { getStepCAClient } from '@/lib/step-ca'
 import type { CertificateInfo } from '@/lib/step-ca'
 
 export default async function CertificatesPage() {
+  const publicDomain = process.env.PUBLIC_DOMAIN?.trim()
+  const publicBaseUrl = process.env.PUBLIC_URL
+    || (publicDomain ? `https://${publicDomain}` : '')
+    || 'http://localhost:3000'
+
   let certificates: CertificateInfo[] = []
   let error = ''
 
@@ -42,11 +47,15 @@ export default async function CertificatesPage() {
         <p className="font-medium mb-2">CA証明書 endpoint</p>
         <div className="space-y-2 font-mono text-xs">
           <div>/api/ca-certs?type=root</div>
-          <div className="text-gray-500">curl -OJ &quot;http://localhost:3000/api/ca-certs?type=root&quot;</div>
-          <div className="text-gray-500">curl -k -OJ &quot;https://localhost/api/ca-certs?type=root&quot;</div>
+          <div className="text-gray-500">curl -OJ &quot;{publicBaseUrl}/api/ca-certs?type=root&quot;</div>
+          {publicBaseUrl.startsWith('https://localhost') ? (
+            <div className="text-gray-500">curl -k -OJ &quot;{publicBaseUrl}/api/ca-certs?type=root&quot;</div>
+          ) : null}
           <div className="pt-2">/api/ca-certs?type=intermediate</div>
-          <div className="text-gray-500">curl -OJ &quot;http://localhost:3000/api/ca-certs?type=intermediate&quot;</div>
-          <div className="text-gray-500">curl -k -OJ &quot;https://localhost/api/ca-certs?type=intermediate&quot;</div>
+          <div className="text-gray-500">curl -OJ &quot;{publicBaseUrl}/api/ca-certs?type=intermediate&quot;</div>
+          {publicBaseUrl.startsWith('https://localhost') ? (
+            <div className="text-gray-500">curl -k -OJ &quot;{publicBaseUrl}/api/ca-certs?type=intermediate&quot;</div>
+          ) : null}
         </div>
       </div>
 
