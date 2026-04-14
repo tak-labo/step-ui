@@ -6,8 +6,8 @@
 
 - **URL**: `http://localhost:3000`
 - **デフォルト認証**: admin / admin123
-- **本番公開**: `docker compose up --build` で Caddy を入口にし、`.env` の `CADDY_ENABLED=true` と `PUBLIC_DOMAIN=<real host>` で有効化する。ローカル検証は `PUBLIC_DOMAIN=localhost` でも可
-- **Caddy 証明書**: step-ca の ACME provisioner `caddy` から自動取得する
+- **本番公開**: `docker compose up --build` で nginx を入口にし、`.env` の `NGINX_ENABLED=true` と `PUBLIC_DOMAIN=<host>` で有効化する。ローカル検証は `PUBLIC_DOMAIN=localhost` でも可
+- **nginx 証明書**: step-ca から直接発行する
 
 ---
 
@@ -16,10 +16,10 @@
 ```
 ブラウザ
   ↓ HTTP / HTTPS
-Caddy (CADDY_ENABLED=true 時の公開入口。ローカルは `localhost`、公開は実ホスト名)
-  ├── 証明書           → step-ca の ACME provisioner `caddy`
+nginx (NGINX_ENABLED=true 時の公開入口。ローカルは `localhost`、公開は実ホスト名)
+  ├── 証明書           → step-ca の直接発行
   ├── /                → step-ui
-  └── /acme/*          → step-ca
+  └── /step-ca/acme/*   → step-ca
         ↓ HTTP
 Next.js App Router (step-ui コンテナ :3000)
   ├── app/(auth)/login/        … ログインページ
@@ -41,8 +41,7 @@ step-ca コンテナ (smallstep/step-ca:latest)
 |-----------|-----------|------|
 | `step-data` | step-ca: `/home/step`<br>step-ui: `/home/step` | CA の証明書・設定・鍵（両コンテナ共有） |
 | `cert-store` | step-ui: `/app/data` | 発行済み証明書のメタデータ JSON（step-ui 専用・書き込み可） |
-| `caddy-data` | caddy: `/data` | Caddy の証明書・ACME データ |
-| `caddy-config` | caddy: `/config` | Caddy の内部設定 |
+| `nginx-certs` | nginx: `/etc/nginx/certs` | nginx の証明書・秘密鍵 |
 
 ---
 
@@ -91,11 +90,10 @@ CA_FINGERPRINT=<フィンガープリント>
 CA_PROVISIONER=admin
 # step-ui は Compose 内で DOCKER_STEPCA_INIT_PASSWORD をそのまま使う
 
-# 本番で Caddy を使う場合
+# 本番で nginx を使う場合
 PUBLIC_DOMAIN=<domain>
 PUBLIC_URL=https://<domain>
-CADDY_ENABLED=true
-CADDY_ACME_PROVISIONER=caddy
+NGINX_ENABLED=true
 # PUBLIC_URL は任意。未設定なら https://PUBLIC_DOMAIN を使う
 
 # NextAuth
@@ -235,7 +233,7 @@ step ca provisioner update admin \
 
 - `maxTLSCertDuration: 87600h` = 10年まで発行可能
 - 更新ロジックは `docker/step-ca-bootstrap.sh` に分離して、`docker-compose.yml` を薄く保つ
-- `caddy` は `.env` の `CADDY_ENABLED=true` で起動し、外向け URL は `PUBLIC_URL` で切り替える
+- `nginx` は `.env` の `NGINX_ENABLED=true` で起動し、外向け URL は `PUBLIC_URL` で切り替える
 
 ### 7. TLS 証明書の信頼
 

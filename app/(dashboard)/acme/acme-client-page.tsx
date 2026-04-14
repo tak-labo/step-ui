@@ -128,10 +128,10 @@ export default function AcmeClientPage({ publicBaseUrl }: AcmeClientPageProps) {
                   certbot等のACMEクライアント用エンドポイント:
                 </p>
                 <code className="text-xs bg-gray-100 p-2 rounded block break-all">
-                  {publicBaseUrl}/acme/{prov.name}/directory
+                  {publicBaseUrl}/step-ca/acme/{prov.name}/directory
                 </code>
                 <p className="text-xs text-gray-400 mt-2">
-                  例: certbot --server {publicBaseUrl}/acme/{prov.name}/directory ...
+                  例: certbot --server {publicBaseUrl}/step-ca/acme/{prov.name}/directory ...
                 </p>
               </CardContent>
             </Card>
