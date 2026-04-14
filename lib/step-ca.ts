@@ -216,22 +216,20 @@ export class StepCAClient {
     return data.provisioners.map(p => ({ name: p.name, type: p.type, details: p }))
   }
 
-  // step CLI 0.28.7 で --provisioner / --issuer フラグ問題が修正された。
-  // "Admin JWK"（--remote-management で作成されるスーパー管理者用プロビジョナー）の
-  // 短命な証明書を取得し、admin API でプロビジョナーを管理する。
-  // docker restart 不要・enableAdmin=true の DB 経由で即時反映される。
   private withAdminCert<T>(fn: (adminCert: string, adminKey: string) => T): T {
     const id = randomBytes(8).toString('hex')
     const adminCert = join(tmpdir(), `step-admin-cert-${id}.crt`)
     const adminKey = join(tmpdir(), `step-admin-key-${id}.key`)
     try {
       this.withPassFile(passFile => {
+        // Remote management は CA 初期化時の JWK provisioner を管理用に昇格させる。
+        // このリポジトリでは CA_PROVISIONER=admin を使うので、その provisioner をそのまま使う。
         execFileSync('step', [
           'ca', 'certificate', 'step',
           adminCert, adminKey,
           '--ca-url', this.config.caUrl,
           '--root', '/home/step/certs/root_ca.crt',
-          '--provisioner', 'Admin JWK',
+          '--provisioner', this.config.provisioner,
           '--provisioner-password-file', passFile,
           '--not-after', '5m',
           '--force',

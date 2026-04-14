@@ -1,0 +1,14 @@
+{$PUBLIC_DOMAIN} {
+    handle /acme/* {
+        reverse_proxy https://step-ca:9000 {
+            transport http {
+                tls_server_name step-ca
+                tls_trusted_ca_certs /home/step/certs/root_ca.crt
+            }
+        }
+    }
+
+    handle {
+        reverse_proxy step-ui:3000
+    }
+}

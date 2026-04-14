@@ -3,34 +3,15 @@ services:
     image: smallstep/step-ca:latest
     container_name: step-ca
     ports:
-      - "9000:9000"
+      - "127.0.0.1:9000:9000"
     volumes:
       - step-data:/home/step
     environment:
-      - STEPCA_PASSWORD
-    entrypoint: /bin/sh
-    command:
-      - -c
-      - |
-        set -e
-        mkdir -p /home/step/config
-        echo "$${STEPCA_PASSWORD:-StepCAPassword123!}" > /home/step/password
-        chmod 600 /home/step/password
-        if [ ! -f /home/step/config/ca.json ]; then
-          step ca init \
-            --name "Step CA" \
-            --dns "step-ca,localhost" \
-            --address ":9000" \
-            --provisioner "admin" \
-            --password-file /home/step/password \
-            --remote-management
-          # authority.claims をグローバルに設定して最大証明書有効期間を10年に拡張する。
-          # --remote-management により enableAdmin: true が自動設定される。
-          # provisioner の claims は step CLI 0.28.7 + admin cert で更新可能だが、
-          # グローバル上限は authority.claims でも設定できるため sed で挿入する。
-          sed -i 's/"authority": {/"authority": {\n\t\t"claims": {"minTLSCertDuration": "5m", "maxTLSCertDuration": "87600h", "defaultTLSCertDuration": "24h"},/' /home/step/config/ca.json
-        fi
-        exec step-ca /home/step/config/ca.json --password-file /home/step/password
+      - DOCKER_STEPCA_INIT_NAME=Step CA
+      - DOCKER_STEPCA_INIT_DNS_NAMES=step-ca,localhost
+      - DOCKER_STEPCA_INIT_PROVISIONER_NAME=admin
+      - DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT=true
+      - DOCKER_STEPCA_INIT_PASSWORD=${DOCKER_STEPCA_INIT_PASSWORD:-StepCAPassword123!}
     healthcheck:
       test: ["CMD-SHELL", "wget -q --no-check-certificate -O- https://localhost:9000/health || exit 1"]
       interval: 5s
@@ -40,38 +21,86 @@ services:
     networks:
       - step-network
 
+  # admin provisioner の claims を更新する one-shot ジョブ
+  step-ca-bootstrap:
+    image: smallstep/step-ca:latest
+    depends_on:
+      step-ca:
+        condition: service_healthy
+    environment:
+      - DOCKER_STEPCA_INIT_PROVISIONER_NAME=admin
+    volumes:
+      - step-data:/home/step
+      - ./docker/step-ca-bootstrap.sh:/usr/local/bin/step-ca-bootstrap.sh:ro
+    command:
+      - /bin/bash
+      - /usr/local/bin/step-ca-bootstrap.sh
+    restart: "no"
+    networks:
+      - step-network
+
   step-ui:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: step-ui
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       step-ca:
         condition: service_healthy
+      step-ca-bootstrap:
+        condition: service_completed_successfully
     volumes:
       - step-data:/home/step
       - cert-store:/app/data
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - CA_URL=${CA_URL}
+      - AUTH_TRUST_HOST=true
       - CA_FINGERPRINT=${CA_FINGERPRINT}
       - CA_PROVISIONER=${CA_PROVISIONER}
-      - CA_PROVISIONER_PASSWORD=${CA_PROVISIONER_PASSWORD}
+      - CA_PROVISIONER_PASSWORD=${DOCKER_STEPCA_INIT_PASSWORD:-StepCAPassword123!}
+      - CA_URL=${CA_URL}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=${NEXTAUTH_URL}
-      - AUTH_TRUST_HOST=true
-      - UI_USERNAME=${UI_USERNAME}
-      - UI_PASSWORD_HASH=${UI_PASSWORD_HASH}
-      - NEXT_PUBLIC_CA_URL=${NEXT_PUBLIC_CA_URL}
+      - NEXTAUTH_URL=${PUBLIC_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_CA_URL=${PUBLIC_URL:-https://step-ca:9000}
       - NODE_EXTRA_CA_CERTS=/home/step/certs/root_ca.crt
+      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-}
+      - PUBLIC_URL=${PUBLIC_URL:-}
+      - UI_PASSWORD_HASH=${UI_PASSWORD_HASH}
+      - UI_USERNAME=${UI_USERNAME}
+    networks:
+      - step-network
+
+  # 本番公開用 reverse proxy
+  caddy:
+    image: caddy:2-alpine
+    container_name: step-ui-caddy
+    profiles:
+      - proxy
+    depends_on:
+      step-ca:
+        condition: service_healthy
+      step-ui:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-localhost}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - step-data:/home/step:ro
+      - caddy-data:/data
+      - caddy-config:/config
     networks:
       - step-network
 
 volumes:
   step-data:
   cert-store:
+  caddy-data:
+  caddy-config:
 
 networks:
   step-network:
