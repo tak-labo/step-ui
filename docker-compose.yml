@@ -39,29 +39,6 @@ services:
     networks:
       - step-network
 
-  nginx-cert-bootstrap:
-    image: smallstep/step-ca:latest
-    user: "0"
-    depends_on:
-      step-ca:
-        condition: service_healthy
-      step-ca-bootstrap:
-        condition: service_completed_successfully
-    environment:
-      - NGINX_ENABLED=${NGINX_ENABLED:-false}
-      - PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-localhost}
-      - CA_PROVISIONER=${CA_PROVISIONER:-admin}
-    volumes:
-      - step-data:/home/step
-      - nginx-certs:/certs
-      - ./docker/nginx-cert-bootstrap.sh:/usr/local/bin/nginx-cert-bootstrap.sh:ro
-    command:
-      - /bin/bash
-      - /usr/local/bin/nginx-cert-bootstrap.sh
-    restart: "no"
-    networks:
-      - step-network
-
   step-ui:
     build:
       context: .
@@ -95,16 +72,14 @@ services:
     networks:
       - step-network
 
-  # 本番公開用 reverse proxy
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: step-ui-nginx
+  # 本番公開用 reverse proxy (Caddy + Cloudflare DNS challenge)
+  caddy:
+    image: ghcr.io/caddybuilds/caddy-cloudflare:latest
+    container_name: step-ui-caddy
     depends_on:
       step-ca:
         condition: service_healthy
       step-ca-bootstrap:
-        condition: service_completed_successfully
-      nginx-cert-bootstrap:
         condition: service_completed_successfully
       step-ui:
         condition: service_started
@@ -112,22 +87,27 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      - NGINX_ENABLED=${NGINX_ENABLED:-false}
+      - CADDY_ENABLED=${CADDY_ENABLED:-false}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
       - PUBLIC_DOMAIN=${PUBLIC_DOMAIN:-localhost}
     volumes:
-      - ./docker/nginx-entrypoint.sh:/usr/local/bin/nginx-entrypoint.sh:ro
+      - ./docker/caddy-entrypoint.sh:/usr/local/bin/caddy-entrypoint.sh:ro
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - step-data:/home/step:ro
-      - nginx-certs:/etc/nginx/certs:ro
+      - caddy-data:/data
+      - caddy-config:/config
     entrypoint:
       - /bin/sh
-      - /usr/local/bin/nginx-entrypoint.sh
+      - /usr/local/bin/caddy-entrypoint.sh
+    restart: "no"
     networks:
       - step-network
 
 volumes:
   step-data:
   cert-store:
-  nginx-certs:
+  caddy-data:
+  caddy-config:
 
 networks:
   step-network:

@@ -1,0 +1,21 @@
+{$PUBLIC_DOMAIN} {
+    tls {
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+    }
+
+    # step-ca の /step-ca/* を step-ca:9000 にプロキシ（内部 CA 証明書で TLS 信頼）
+    handle /step-ca/* {
+        uri strip_prefix /step-ca
+        reverse_proxy https://step-ca:9000 {
+            transport http {
+                tls
+                tls_trusted_ca_certs /home/step/certs/root_ca.crt
+            }
+        }
+    }
+
+    # step-ui (Next.js) へのリバースプロキシ
+    handle {
+        reverse_proxy step-ui:3000
+    }
+}
